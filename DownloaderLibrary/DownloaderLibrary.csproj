@@ -21,23 +21,23 @@ All Requests will be handled by an PriorityQueue in a Parallel state to have a s
     <Authors>Meyn</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>HttpClient, Request, Free to use, file downloader, downloader, http,  .Net, WPF, Console, Document, PriorityQueue, downloadmanagement, Json, CSV, download-filestream, IProgress</PackageTags>
-    <PackageIcon>Logo.png</PackageIcon>
+    <PackageIcon>logo.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Verbsesserter Dokumentation</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <PackageProjectUrl>https://github.com/Meyn1/DownloadLibrary</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Meyn1/DownloadLibrary</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="C:\Users\Sandmann\Pictures\Saved Pictures\Logo.png">
+    <None Include="..\logo.png">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="README.md">
+    <None Include="..\README.md">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
