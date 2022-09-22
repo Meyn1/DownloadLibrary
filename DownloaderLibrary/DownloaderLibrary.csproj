@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+    <Title>DonwloadLibrary</Title>
+    <Company>Shard</Company>
+    <Description>A free to use library as wrapper around the HttpClient.
+All Requests will be handled by an PriorityQueue in a Parallel state to have a simple and efficient way to handle many (Tested with more than 100+) Http Requests without delay. Also includes retry, priority function and second (Download) thread for larger files.
+ At the moment:
+      • StatusRequest: Calls a Head request and returns a response message with the headers.
+      • OwnRequest: Wrapper around your own requests. Easy to self-expand function.
+      • Request: Main class that can be used to expand functionality on class-based level.
+      • LoadRequest: To download the response into files.
+         o This is a HTTP file downloader with pause function and resuming function of partially downloaded files. 
+             If the download is interrupted and restarted, only the remaining part of file would be downloaded again if the server implements partially get requests. Tries to get Filename from server but also can be set manually. Can be downloaded direct into download directory or can set path manually. Contains IProgress&lt;foat&gt; to easy watch the download progress.</Description>
+    <Copyright>Shard © 2022 | Free to </Copyright>
+    <PackageId>Shard.DonwloadLibrary</PackageId>
+    <Authors>Meyn</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>HttpClient, Request, Free to use, file downloader, downloader, http,  .Net, WPF, Console, Document, PriorityQueue, downloadmanagement, Json, CSV, download-filestream, IProgress</PackageTags>
+    <PackageIcon>Logo.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Verbsesserter Dokumentation</PackageReleaseNotes>
+    <NeutralLanguage>en</NeutralLanguage>
+    <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="C:\Users\Sandmann\Pictures\Saved Pictures\Logo.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>
