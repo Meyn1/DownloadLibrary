@@ -2,8 +2,8 @@
 ## _Shard HttpClient Library to handle Requests_
 
 
-The Shard DownloadLibrary is an on .Net 6 based wrapper around the `HttpClient` to manage your HttpRequests.
-All `Requests` will be handled by an `PriorityQueue` in a Parallel state to have a simple and efficient way to handle many (Tested with more than 100+) Http Requests.
+The Shard DownloadLibrary is an on .Net 6.0 based wrapper around the `HttpClient` to manage your HttpRequests. But it can also be used without the `HttpClient` to handle CPU intensive tasks.
+All `Requests` will be handled by an `PriorityQueue` in a Parallel state to have a simple and efficient way to handle many (Tested with more than 500+) Http Requests.
 
 - Easy to use!
 - Efficient 
@@ -24,11 +24,11 @@ At the moment:
   - This is a Http file downloader with this functions:
   - *Pause* and *Start* a download
   - *Resume* a download
-  - Gets the *file name* and *extension* from the server (if available*)
+  - Gets the *file name* and *extension* from the server 
   - Monitor the progress of the download with `IProgress<float>`
   - Can set path and filename 
+  - Download a specified range of a file
   - Exclude extensions for savety _(.exe; .bat.; etc...)_
-  - (*Some functions at the moment are only available under Windows)
 
 > Expand and use as you like!
 
@@ -38,8 +38,8 @@ Repository: https://github.com/Meyn1/DownloadLibrary
 
 ## Installation
 
-Installation over NuGet Packagemanager in Visual Studio or online.
-URL: https://www.nuget.org/packages/Shard.DonwloadLibrary
+Installation over [NuGet](https://www.nuget.org/packages/Shard.DonwloadLibrary) Packagemanager in Visual Studio or online.
+URL: https://www.nuget.org/packages/Shard.DonwloadLibrary.
 Package Manager Console: PM> NuGet\Install-Package Shard.DonwloadLibrary -Version 1.0.0
 
 ## How to use
@@ -48,21 +48,22 @@ Import the Library
 ```cs
 using DownloaderLibrary.Request;
 ```
-Then create a new `Request` oject like this `LoadRequest`
-This downloads a file into the downloads folder of the PC with an .part file and uses the name that the server provides.
+Then create a new `Request` object like this `LoadRequest`
+This `LoadRequest` downloads a file into the downloads folder of the PC with an ".part" file and uses the name that the server provides.
 ```cs
 //To download a file and store it in "Downloads" folder
 new LoadRequest("[Your URL]"); // e.g. https://speed.hetzner.de/100MB.bin
 ```
-To set options on the Request create a `RequestOption` or for a LoadRequest a `LoadRequestOption`
+To set options on the `Request` create a `RequestOption` or for a `LoadRequest` a `LoadRequestOption`
 ```cs
 // Create an option for a LoadRequest
   LoadRequestOptions requestOptions = new()
         {
             // Sets the filename of the download without the extension
+            // The extension will be added automatically!
             FileName = "downloadfile", 
             // If this download has priority (default is false)
-            HasPriority = true, 
+            PriorityLevel = PriorityLevel.High;, 
             //(default is download folder)
             Path = "C:\\Users\\[Your Username]\\Desktop", 
             // If this Request contains a heavy request put it in second thread (default is false)
@@ -74,7 +75,7 @@ To set options on the Request create a `RequestOption` or for a LoadRequest a `L
             Progress = new Progress<float>((percent => Console.WriteLine(percent + "%"))) 
         };
 ```
-And unse it in the Request
+And use it in the Request
 ```cs
 //To download a file and store it on the Desktop with a different name
 new LoadRequest(" https://speed.hetzner.de/100MB.bin",requestOptions);
@@ -91,7 +92,7 @@ Create an `OwnRequest` like this:
         {
             //Create your Request Massage. Here the body of google.com
             HttpRequestMessage requestMessage = new(HttpMethod.Get, "https://www.google.com");
-            //Send your request and get the result. Pass the CancellationToken for handling later over the Request object
+            //Send your request and get the result. Pass the CancellationToken for handling it later over the Request object
             var response = DownloadHandler.Instance.SendAsync(requestMessage, downloadToken).Result;
             //If the resposne does not succeed
             if (!response.IsSuccessStatusCode)
@@ -101,13 +102,13 @@ Create an `OwnRequest` like this:
             return true;
         });
 ```
-To Create your own Request child. Here the implementation of the `OwnRequest` class:
+To Create your own `Request` child. Here the implementation of the `OwnRequest` class:
 ```cs
     public class OwnRequest : Request
     {
         private readonly Func<CancellationToken, Task<bool>> _own;
         
-        //Parent sets the Url field but doesn't need it and doesn't require a requestOption because it creates then a new one.
+        //Parent sets the Url field but doesn't need it and doesn't require a RequestOption because it creates then a new one.
         //But to use the options it have to be passed over to the parent
         public OwnRequest(Func<CancellationToken, Task<bool>> own, RequestOptions? requestOptions = null) : base(string.Empty, requestOptions)
         {

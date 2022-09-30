@@ -1,4 +1,4 @@
-﻿namespace DownloaderLibrary.Request
+﻿namespace DownloaderLibrary.Requests
 {
     /// <summary>
     /// A Class to easy implement a <see cref="Request"/> functionality without creating a new <see cref="Request"/> child.

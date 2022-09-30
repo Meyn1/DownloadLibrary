@@ -1,11 +1,7 @@
-﻿using System.Collections.Generic;
-using System.Threading;
-using System.Linq;
-
-namespace System.Collections.Concurrent
+﻿namespace System.Collections.Concurrent
 {
     /// <summary>Extension methods for BlockingCollection.</summary>
-    public static class BlockingCollectionExtensions
+    internal static class BlockingCollectionExtensions
     {
         /// <summary>
         /// Gets a partitioner for a BlockingCollection that consumes and yields the contents of the BlockingCollection.</summary>
@@ -39,7 +35,7 @@ namespace System.Collections.Concurrent
             public override IList<IEnumerator<T>> GetPartitions(int partitionCount)
             {
                 if (partitionCount < 1) throw new ArgumentOutOfRangeException(nameof(partitionCount));
-                var dynamicPartitioner = GetDynamicPartitions();
+                IEnumerable<T> dynamicPartitioner = GetDynamicPartitions();
                 return Enumerable.Range(0, partitionCount).Select(_ => dynamicPartitioner.GetEnumerator()).ToArray();
             }
 
@@ -60,7 +56,7 @@ namespace System.Collections.Concurrent
         /// </param>
         public static void AddFromEnumerable<T>(this BlockingCollection<T> target, IEnumerable<T> source, bool completeAddingWhenDone)
         {
-            try { foreach (var item in source) target.Add(item); }
+            try { foreach (T? item in source) target.Add(item); }
             finally { if (completeAddingWhenDone) target.CompleteAdding(); }
         }
 

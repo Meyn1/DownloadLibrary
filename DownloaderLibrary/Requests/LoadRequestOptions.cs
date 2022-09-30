@@ -1,6 +1,6 @@
 ﻿using DownloaderLibrary.Utilities;
 
-namespace DownloaderLibrary.Request
+namespace DownloaderLibrary.Requests
 {
     /// <summary>
     /// File load mode of the <see cref="LoadRequest"/>.
@@ -48,6 +48,20 @@ namespace DownloaderLibrary.Request
             get => _fileName;
             set => _fileName = IOManager.RemoveInvalidFileNameChars(value);
         }
+
+        /// <summary>
+        /// Chunks in that the request sould be downloaded
+        /// (Only if server supports it)
+        /// Not implemented yet!
+        /// </summary>
+        public int? Chunks { get => null; set => throw new NotImplementedException(); }
+
+        /// <summary>
+        /// Sets the download range of the Load request
+        /// Start can not be used with LoadMode.Append it will switch to LoadMode.Create
+        /// </summary>
+        public Range Range { get; set; }
+
         /// <summary>
         /// Path to the diriectory where the .part file sould be stored.
         /// Default is the <see cref="DestinationPath"/>.
@@ -93,17 +107,48 @@ namespace DownloaderLibrary.Request
         /// Constructor that copys the values from one <see cref="LoadRequestOption"/> to a new one.
         /// </summary>
         /// <param name="options">Option that sould be copied</param>
-        public LoadRequestOption(LoadRequestOption? options) : base(options)
+        /// <exception cref="ArgumentNullException">Throws exception if <see cref="LoadRequestOption"/> is null</exception>
+        public LoadRequestOption(LoadRequestOption options) : base(options)
         {
-            if (options == null)
-                return;
-            IsDownload = options.IsDownload;
             ExcludedExtensions = options.ExcludedExtensions;
             Mode = options.Mode;
             Progress = options.Progress;
+            // Chunks = options.Chunks;
+            Range = options.Range;
             _fileName = options.FileName;
             _temporaryPath = options.TemporaryPath;
             _destinationPath = options.DestinationPath;
         }
+    }
+
+    /// <summary>
+    /// Sets and Gets the download range of a file if supported
+    /// </summary>
+    public struct Range
+    {
+        /// <summary>
+        /// Creates a Range out two longs
+        /// </summary>
+        public Range(long? start, long? end)
+        {
+            Start = start;
+            End = end == 0 ? null : end;
+        }
+        /// <summary>
+        /// Retuns the Length
+        /// </summary>
+        public long? Length => 1 + End - (Start ?? 0);
+
+
+        /// <summary>
+        /// Start point in bytes
+        /// zero based
+        /// </summary>
+        public long? Start { get; set; } = null;
+        /// <summary>
+        /// End point in bytes
+        /// zero based
+        /// </summary>
+        public long? End { get; set; } = null;
     }
 }

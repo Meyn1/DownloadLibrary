@@ -8,17 +8,17 @@ namespace DownloaderLibrary.Utilities
     {
         // Each internal queue in the array represents a priority level.
         // All elements in a given array share the same priority.
-        private ConcurrentQueue<KeyValuePair<int, TValue>>[] _queues = null!;
+        private readonly ConcurrentQueue<KeyValuePair<int, TValue>>[] _queues = null!;
 
         // The number of queues we store internally.
-        private int priorityCount = 0;
+        private readonly int _priorityCount = 0;
         private int m_count = 0;
 
         public PriorityQueue(int priCount)
         {
-            this.priorityCount = priCount;
-            _queues = new ConcurrentQueue<KeyValuePair<int, TValue>>[priorityCount];
-            for (int i = 0; i < priorityCount; i++)
+            _priorityCount = priCount;
+            _queues = new ConcurrentQueue<KeyValuePair<int, TValue>>[_priorityCount];
+            for (int i = 0; i < _priorityCount; i++)
                 _queues[i] = new ConcurrentQueue<KeyValuePair<int, TValue>>();
         }
 
@@ -32,24 +32,22 @@ namespace DownloaderLibrary.Utilities
 
         public bool TryTake(out KeyValuePair<int, TValue> item)
         {
-            bool success = false;
-
             // Loop through the queues in priority order
             // looking for an item to dequeue.
-            for (int i = 0; i < priorityCount; i++)
-            {
+            for (int i = 0; i < _priorityCount; i++)
+
                 // Lock the internal data so that the Dequeue
                 // operation and the updating of m_count are atomic.
                 lock (_queues)
                 {
-                    success = _queues[i].TryDequeue(out item);
+                    bool success = _queues[i].TryDequeue(out item);
                     if (success)
                     {
                         Interlocked.Decrement(ref m_count);
                         return true;
                     }
                 }
-            }
+
 
             // If we get here, we found nothing.
             // Assign the out parameter to its default value and return false.
@@ -57,16 +55,12 @@ namespace DownloaderLibrary.Utilities
             return false;
         }
 
-        public int Count
-        {
-            get { return m_count; }
-        }
+        public int Count => m_count;
 
         // Required for ICollection
-        void ICollection.CopyTo(Array array, int index)
-        {
+        void ICollection.CopyTo(Array array, int index) =>
             CopyTo((KeyValuePair<int, TValue>[])array, index);
-        }
+
 
         // CopyTo is problematic in a producer-consumer.
         // The destination array might be shorter or longer than what
@@ -75,11 +69,9 @@ namespace DownloaderLibrary.Utilities
         // data as we have without running off the end.
         public void CopyTo(KeyValuePair<int, TValue>[] destination, int destStartingIndex)
         {
-            if (destination == null) throw new ArgumentNullException();
+            _ = destination ?? throw new ArgumentNullException();
             if (destStartingIndex < 0) throw new ArgumentOutOfRangeException();
-
-            int remaining = destination.Length;
-            KeyValuePair<int, TValue>[] temp = this.ToArray();
+            KeyValuePair<int, TValue>[] temp = ToArray();
             for (int i = 0; i < destination.Length && i < temp.Length; i++)
                 destination[i] = temp[i];
         }
@@ -90,45 +82,30 @@ namespace DownloaderLibrary.Utilities
 
             lock (_queues)
             {
-                result = new KeyValuePair<int, TValue>[this.Count];
+                result = new KeyValuePair<int, TValue>[Count];
                 int index = 0;
-                foreach (var q in _queues)
-                {
+                foreach (ConcurrentQueue<KeyValuePair<int, TValue>> q in _queues)
                     if (q.Count > 0)
                     {
                         q.CopyTo(result, index);
                         index += q.Count;
                     }
-                }
                 return result;
             }
         }
 
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
 
         public IEnumerator<KeyValuePair<int, TValue>> GetEnumerator()
         {
-            for (int i = 0; i < priorityCount; i++)
-            {
-                foreach (var item in _queues[i])
+            for (int i = 0; i < _priorityCount; i++)
+                foreach (KeyValuePair<int, TValue> item in _queues[i])
                     yield return item;
-            }
         }
 
-        public bool IsSynchronized
-        {
-            get
-            {
-                throw new NotSupportedException();
-            }
-        }
+        public bool IsSynchronized => throw new NotSupportedException();
+        public object SyncRoot => throw new NotSupportedException();
 
-        public object SyncRoot
-        {
-            get { throw new NotSupportedException(); }
-        }
     }
 }

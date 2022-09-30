@@ -1,6 +1,4 @@
-﻿using DownloaderLibrary.Utilities;
-
-namespace DownloaderLibrary.Request
+﻿namespace DownloaderLibrary.Requests
 {
     /// <summary>
     /// Indicates the state of a <see cref="Request"/>.
@@ -24,12 +22,16 @@ namespace DownloaderLibrary.Request
         /// </summary>
         Onhold,
         /// <summary>
+        /// <see cref="Request"/> is cancelled.
+        /// </summary>
+        Cancelled,
+        /// <summary>
         /// <see cref="Request"/> failed.
         /// </summary>
         Failed
     }
     /// <summary>
-    /// A <see cref="Request"/> object that can be managed by the <see cref="DownloadHandler"/>.
+    /// A <see cref="Request"/> object that can be managed by the <see cref="RequestHandler"/>.
     /// </summary>
     public abstract class Request : IDisposable
     {
@@ -89,9 +91,9 @@ namespace DownloaderLibrary.Request
             _url = url;
             Options = options != null ? new(options) : new();
             if (Options.CancellationToken.HasValue)
-                _cts = CancellationTokenSource.CreateLinkedTokenSource(DownloadHandler.Instance.MainCT, Options.CancellationToken.Value);
+                _cts = CancellationTokenSource.CreateLinkedTokenSource(Options.RequestHandler.CT, Options.CancellationToken.Value);
             else
-                _cts = CancellationTokenSource.CreateLinkedTokenSource(DownloadHandler.Instance.MainCT);
+                _cts = CancellationTokenSource.CreateLinkedTokenSource(Options.RequestHandler.CT);
         }
 
         /// <summary>
@@ -102,13 +104,13 @@ namespace DownloaderLibrary.Request
         /// /// <exception cref="InvalidOperationException"></exception>
         public void Cancel()
         {
-            State = RequestState.Onhold;
+            State = RequestState.Cancelled;
             _cts.Cancel();
             _isFinished.SetResult();
         }
         /// <summary>
         /// Dispose the <see cref="Request"/>. 
-        /// Will be called automaticly ba the <see cref="DownloadHandler"/>.
+        /// Will be called automaticly ba the <see cref="RequestHandler"/>.
         /// </summary>
         /// <exception cref="AggregateException"></exception>
         /// <exception cref="ArgumentException"></exception>
@@ -150,16 +152,15 @@ namespace DownloaderLibrary.Request
                 if (State != RequestState.Available || Options.CancellationToken.HasValue && Options.CancellationToken.Value.IsCancellationRequested)
                     return;
 
-
                 if (_cts.IsCancellationRequested)
                 {
-                    if (DownloadHandler.Instance.MainCT.IsCancellationRequested)
+                    if (Options.RequestHandler.CT.IsCancellationRequested)
                         return;
                     _cts.Dispose();
                     if (Options.CancellationToken.HasValue)
-                        _cts = CancellationTokenSource.CreateLinkedTokenSource(DownloadHandler.Instance.MainCT, Options.CancellationToken.Value);
+                        _cts = CancellationTokenSource.CreateLinkedTokenSource(Options.RequestHandler.CT, Options.CancellationToken.Value);
                     else
-                        _cts = CancellationTokenSource.CreateLinkedTokenSource(DownloadHandler.Instance.MainCT);
+                        _cts = CancellationTokenSource.CreateLinkedTokenSource(Options.RequestHandler.CT);
                 }
                 State = RequestState.Running;
             }
@@ -174,13 +175,12 @@ namespace DownloaderLibrary.Request
 
             }
             catch (Exception) { }
-
-            if (State == RequestState.Running || State == RequestState.Onhold)
+            if (State == RequestState.Running || State == RequestState.Cancelled)
                 if (compleated)
                     State = RequestState.Compleated;
                 else if (Token.IsCancellationRequested)
                     if (Options.CancellationToken.HasValue && Options.CancellationToken.Value.IsCancellationRequested)
-                        State = RequestState.Failed;
+                        State = RequestState.Cancelled;
                     else
                         State = RequestState.Available;
                 else if (_tryCounter++ < Options.TryCounter)
@@ -205,7 +205,7 @@ namespace DownloaderLibrary.Request
             if (State != RequestState.Onhold)
                 return;
             State = RequestState.Available;
-            DownloadHandler.Instance.Add(this);
+            Options.RequestHandler.RunRequests(this);
         }
         /// <summary>
         /// Set the <see cref="Request"/> on hold.

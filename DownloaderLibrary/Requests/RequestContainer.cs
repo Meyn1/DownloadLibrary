@@ -1,4 +1,4 @@
-﻿namespace DownloaderLibrary.Request
+﻿namespace DownloaderLibrary.Requests
 {
     /// <summary>
     /// Class to manage and merge more than one <see cref="Request"/>.

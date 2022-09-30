@@ -1,4 +1,4 @@
-﻿namespace DownloaderLibrary.Request
+﻿namespace DownloaderLibrary.Requests
 {
     /// <summary>
     /// Request that only gets the Headers of an URL.
@@ -23,7 +23,7 @@
             {
                 using CancellationTokenSource? tok = CancellationTokenSource.CreateLinkedTokenSource(Token);
                 tok.CancelAfter(TimeSpan.FromSeconds(10));
-                using HttpResponseMessage? res = await Utilities.DownloadHandler.Instance.SendAsync(new HttpRequestMessage(HttpMethod.Head, _url), tok.Token);
+                using HttpResponseMessage? res = await RequestHandler.HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, _url), tok.Token);
                 if (res.IsSuccessStatusCode)
                     Options.CompleatedAction?.Invoke(res);
                 else Options.FaultedAction?.Invoke(res);
