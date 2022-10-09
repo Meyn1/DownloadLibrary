@@ -24,7 +24,7 @@ namespace DownloaderLibrary.Requests
     /// A Class to hold the options for a <see cref="LoadRequest"/> class and to modify it.
     /// </summary>
 
-    public class LoadRequestOption : RequestOptions
+    public class LoadRequestOptions : RequestOptions
     {
         /// <summary>
         /// File writing mode
@@ -52,9 +52,10 @@ namespace DownloaderLibrary.Requests
         /// <summary>
         /// Chunks in that the request sould be downloaded
         /// (Only if server supports it)
-        /// Not implemented yet!
+        /// You Can not stop and Resume if this function is used!
+        /// Help to implement this function on GitHub please!
         /// </summary>
-        public int? Chunks { get => null; set => throw new NotImplementedException(); }
+        public byte Chunks { get; set; }
 
         /// <summary>
         /// Sets the download range of the Load request
@@ -102,18 +103,18 @@ namespace DownloaderLibrary.Requests
         /// <summary>
         /// Default constructor
         /// </summary>
-        public LoadRequestOption() { }
+        public LoadRequestOptions() { }
         /// <summary>
-        /// Constructor that copys the values from one <see cref="LoadRequestOption"/> to a new one.
+        /// Constructor that copys the values from one <see cref="LoadRequestOptions"/> to a new one.
         /// </summary>
         /// <param name="options">Option that sould be copied</param>
-        /// <exception cref="ArgumentNullException">Throws exception if <see cref="LoadRequestOption"/> is null</exception>
-        public LoadRequestOption(LoadRequestOption options) : base(options)
+        /// <exception cref="ArgumentNullException">Throws exception if <see cref="LoadRequestOptions"/> is null</exception>
+        public LoadRequestOptions(LoadRequestOptions options) : base(options)
         {
             ExcludedExtensions = options.ExcludedExtensions;
             Mode = options.Mode;
             Progress = options.Progress;
-            // Chunks = options.Chunks;
+            Chunks = options.Chunks;
             Range = options.Range;
             _fileName = options.FileName;
             _temporaryPath = options.TemporaryPath;

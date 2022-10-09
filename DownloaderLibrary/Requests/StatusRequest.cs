@@ -8,6 +8,7 @@
     {
         /// <summary>
         /// Constructor for the <see cref="StatusRequest"/>
+        /// CompleatedAction returns a <see cref="HttpResponseMessage"/>
         /// </summary>
         /// <param name="url">URL to get the Head response from</param>
         /// <param name="options">Options to modify the <see cref="Request"/></param>

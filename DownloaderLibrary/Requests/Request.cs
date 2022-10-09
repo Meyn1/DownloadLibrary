@@ -87,7 +87,6 @@
         /// <param name="options">Options to modify the <see cref="Request"/></param>
         public Request(string url = "", RequestOptions? options = null)
         {
-
             _url = url;
             Options = options != null ? new(options) : new();
             if (Options.CancellationToken.HasValue)

@@ -28,6 +28,7 @@ At the moment:
   - Monitor the progress of the download with `IProgress<float>`
   - Can set path and filename 
   - Download a specified range of a file
+  - Part a file into chunks but is not recommended (please help to update)
   - Exclude extensions for savety _(.exe; .bat.; etc...)_
 
 > Expand and use as you like!
@@ -40,13 +41,13 @@ Repository: https://github.com/Meyn1/DownloadLibrary
 
 Installation over [NuGet](https://www.nuget.org/packages/Shard.DonwloadLibrary) Packagemanager in Visual Studio or online.
 URL: https://www.nuget.org/packages/Shard.DonwloadLibrary.
-Package Manager Console: PM> NuGet\Install-Package Shard.DonwloadLibrary -Version 1.0.0
+Package Manager Console: PM> NuGet\Install-Package Shard.DonwloadLibrary -Version 1.0.2
 
 ## How to use
 
 Import the Library
 ```cs
-using DownloaderLibrary.Request;
+using DownloaderLibrary.Requests;
 ```
 Then create a new `Request` object like this `LoadRequest`
 This `LoadRequest` downloads a file into the downloads folder of the PC with an ".part" file and uses the name that the server provides.
@@ -63,7 +64,7 @@ To set options on the `Request` create a `RequestOption` or for a `LoadRequest` 
             // The extension will be added automatically!
             FileName = "downloadfile", 
             // If this download has priority (default is false)
-            PriorityLevel = PriorityLevel.High;, 
+            PriorityLevel = PriorityLevel.High, 
             //(default is download folder)
             Path = "C:\\Users\\[Your Username]\\Desktop", 
             // If this Request contains a heavy request put it in second thread (default is false)

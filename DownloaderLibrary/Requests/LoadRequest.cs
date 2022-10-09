@@ -11,7 +11,7 @@ namespace DownloaderLibrary.Requests
     public class LoadRequest : Request
     {
         private Lazy<long?> _contentLength;
-        internal new LoadRequestOption Options => (LoadRequestOption)base.Options;
+        internal new LoadRequestOptions Options => (LoadRequestOptions)base.Options;
         /// <summary>
         /// Bytes that were written to the disc
         /// </summary>
@@ -23,13 +23,17 @@ namespace DownloaderLibrary.Requests
 
         private Range Range => Options.Range;
 
+        internal Chunk? _chunk;
+
+        private string TempExt { get; set; } = ".part";
+
         /// <summary>
         /// Constructor for a <see cref="LoadRequest"/>.
         /// </summary>
         /// <param name="sourceUrl">URL of the content that sould be saved</param>
         /// <param name="options">Options to modify the <see cref="LoadRequest"/></param>
         /// <exception cref="ArgumentNullException"></exception>
-        public LoadRequest(string sourceUrl, LoadRequestOption? options = null) : base(sourceUrl, null)
+        public LoadRequest(string sourceUrl, LoadRequestOptions? options = null) : base(sourceUrl, null)
         {
             if (string.IsNullOrEmpty(sourceUrl))
                 throw new ArgumentNullException(nameof(sourceUrl));
@@ -38,7 +42,7 @@ namespace DownloaderLibrary.Requests
             if (options?.Range.Start != null && options?.Mode == LoadMode.Append)
                 options.Mode = LoadMode.Create;
 
-            base.Options = options != null ? new LoadRequestOption(options) : new LoadRequestOption();
+            base.Options = options != null ? new LoadRequestOptions(options) : new LoadRequestOptions();
             _contentLength = new Lazy<long?>(GetContentLength);
             Directory.CreateDirectory(Options.DestinationPath);
             if (!string.IsNullOrWhiteSpace(Options.TemporaryPath))
@@ -47,7 +51,43 @@ namespace DownloaderLibrary.Requests
                 Options.TemporaryPath = Options.DestinationPath;
             LoadFileInfo();
             Start();
+            InitializeChunks();
         }
+
+        private void InitializeChunks()
+        {
+            if (!(Options.Chunks > 0))
+                return;
+            _chunk = new() { Requests = new() { this }, Index = 0, Destinations = new(Options.Chunks), ProgressList = new(new float[Options.Chunks]) };
+            IProgress<float>? progress = Options.Progress;
+            Options.Progress = new Progress<float>(f =>
+            {
+                lock (_chunk.ProgressList)
+                { _chunk.ProgressList[_chunk.Index] = f; progress?.Report(_chunk.ProgressList.Sum() / Options.Chunks); }
+            });
+            TempExt = "_0.chunk";
+            for (byte i = 1; i < Options.Chunks; i++)
+                _ = new LoadRequest(_chunk, this, i, progress);
+
+
+        }
+
+        private LoadRequest(Chunk chunk, LoadRequest startRequest, byte index, IProgress<float>? progress) : base(startRequest._url, null)
+        {
+            _contentLength = startRequest._contentLength;
+            base.Options = new LoadRequestOptions(startRequest.Options);
+
+            chunk.Requests.Add(this);
+            _chunk = new() { Requests = chunk.Requests, Index = index, Destinations = chunk.Destinations, ProgressList = chunk.ProgressList };
+            Options.Progress = new Progress<float>(f =>
+            {
+                lock (_chunk.ProgressList)
+                { _chunk.ProgressList[_chunk.Index] = f; progress?.Report(_chunk.ProgressList.Sum() / Options.Chunks); }
+            });
+            TempExt = $"_{index}.chunk";
+            Start();
+        }
+
 
 
         /// <summary>
@@ -63,15 +103,13 @@ namespace DownloaderLibrary.Requests
                 using HttpResponseMessage? responseMessage = RequestHandler.HttpClient.Send(new HttpRequestMessage(HttpMethod.Head, _url), Token);
                 if (responseMessage.IsSuccessStatusCode)
                     length = responseMessage.Content.Headers.ContentLength;
-                if (Range.Start != null || Range.End != null)
-                {
-                    if (Range.End > length)
-                        Options.Range = new Range(Range.Start, null);
-                    if (Range.Length == null)
-                        length -= Range.Start;
-                    else
-                        length = Range.Length;
-                }
+                if (_chunk != null)
+                    foreach (LoadRequest request in _chunk.Requests)
+                    {
+                        if (request != this)
+                            request.SetRange(length);
+                    };
+                length = SetRange(length);
             }
             catch (ArgumentNullException) { }
             catch (InvalidOperationException) { }
@@ -81,22 +119,37 @@ namespace DownloaderLibrary.Requests
             return length == 0 ? null : length;
         }
 
+        private long? SetRange(long? length)
+        {
+
+            if (Range.Start != null || Range.End != null)
+            {
+                if (Range.End > length)
+                    Options.Range = new Range(Range.Start, null);
+                if (Range.Length == null)
+                    length -= Range.Start;
+                else
+                    length = Range.Length;
+            }
+            return length;
+
+        }
+
         /// <summary>
         /// Loads file info if the file exsists
         /// </summary>
         /// <exception cref="InvalidOperationException"></exception>
         private void LoadFileInfo()
         {
-
             string fileName = Options.FileName;
             if (Options.Mode != LoadMode.Append || BytesWritten != null || !fileName.Contains('.'))
                 return;
             try
             {
-                string tmpPath = Path.Combine(Options.TemporaryPath, fileName + ".part");
+                string tmpPath = Path.Combine(Options.TemporaryPath, fileName + TempExt);
                 if (File.Exists(tmpPath))
                     BytesWritten = new FileInfo(tmpPath).Length;
-                else if (Path.Combine(Options.DestinationPath, fileName) is string path && File.Exists(path))
+                else if (_chunk == null && Path.Combine(Options.DestinationPath, fileName) is string path && File.Exists(path))
                 {
                     BytesWritten = new FileInfo(path).Length;
                     File.Move(path, tmpPath, true);
@@ -155,15 +208,16 @@ namespace DownloaderLibrary.Requests
 
             HttpResponseMessage res = await SendHttpMenssage();
 
-            Debug.WriteLine(res.StatusCode);
             if (!res.IsSuccessStatusCode)
                 return new(false, res);
-            bool fileNowLoaded = BytesWritten == null;
+            bool fileNowLoaded = (BytesWritten ?? 0) == 0;
+            bool ContentlegthNowLoaded = (ContentLength ?? 0) == 0;
             SetFileInfo(res.Content.Headers);
             if (IsFinished())
                 return new(true, res);
-            else if (BytesWritten > 1048576 && fileNowLoaded)
+            else if (fileNowLoaded && BytesWritten > 1048576 || ContentlegthNowLoaded && (_chunk != null || Range.Length != null))
             {
+                _ = SetRange(res.Content.Headers.ContentLength);
                 HttpResponseMessage? newRes = await SendHttpMenssage();
                 if (newRes.IsSuccessStatusCode)
                 {
@@ -172,28 +226,58 @@ namespace DownloaderLibrary.Requests
                 }
             }
             long tmpBytesWritten = 0;
-            string tmpPath = Path.Combine(Options.TemporaryPath, Options.FileName + ".part");
+            string tmpPath = Path.Combine(Options.TemporaryPath, Options.FileName + TempExt);
 
+            if (res.Content.Headers.ContentLength.HasValue)
+            {
+                long length = res.Content.Headers.ContentLength.Value;
+                if ((_contentLength.Value ?? 0) != length &&
+               (_contentLength.Value ?? 0) != length + (BytesWritten ?? 0))
+                    _contentLength = new(length);
+            }
             if (res.StatusCode != System.Net.HttpStatusCode.PartialContent)
             {
+                if (_chunk != null)
+                {
+                    List<LoadRequest> requests = _chunk.Requests.ToList();
+                    for (int i = 1; i < requests.Count; i++)
+                    {
+                        requests[i].Cancel();
+                        string rPath = Path.Combine(Options.TemporaryPath, Options.FileName + requests[i].TempExt);
+                        if (File.Exists(rPath))
+                            File.Delete(rPath);
+
+                    }
+                    if (File.Exists(tmpPath))
+                        File.Delete(tmpPath);
+                    TempExt = ".part";
+                    _chunk = null;
+                    tmpPath = Path.Combine(Options.TemporaryPath, Options.FileName + TempExt);
+                }
                 File.Create(tmpPath).Dispose();
                 BytesWritten = 0;
-                _contentLength = new(res.Content.Headers?.ContentLength);
             }
             else
                 tmpBytesWritten = BytesWritten ?? 0;
 
+
             string path = Path.Combine(Options.DestinationPath, Options.FileName);
-            if (!File.Exists(path))
+            if (!File.Exists(path) && (_chunk?.Index == 0 || _chunk == null))
                 File.Create(path).Dispose();
 
             await WriterAsync(res);
 
             stopwatch.Stop();
-            if (State == RequestState.Running)
+
+            if (State == RequestState.Running && _chunk == null)
                 File.Move(tmpPath, path, true);
+
             if (BytesWritten != null)
                 Options.RequestHandler.AddSpeed((int)((BytesWritten - tmpBytesWritten) / stopwatch.Elapsed.TotalSeconds));
+            if (State == RequestState.Running)
+                _chunk?.Destinations.Enqueue(tmpPath, _chunk.Index);
+            if (_chunk != null && _chunk.Destinations.Count == Options.Chunks)
+                CombineMultipleFiles();
             return new(true, res);
         }
 
@@ -202,10 +286,24 @@ namespace DownloaderLibrary.Requests
             HttpRequestMessage? msg = new(HttpMethod.Get, _url);
             Range loadRange = new((Range.Start ?? 0) + (BytesWritten ?? 0), Range.End);
 
-            Debug.WriteLine(loadRange.Start);
-            Debug.WriteLine(loadRange.End);
-            if (loadRange.Length != null || loadRange.Start != 0)
-                msg.Headers.Range = new RangeHeaderValue(loadRange.Start, loadRange.End);
+            if (_chunk == null)
+            {
+                if (loadRange.Length != null || loadRange.Start != 0)
+                    msg.Headers.Range = new RangeHeaderValue(loadRange.Start, loadRange.End);
+            }
+            else
+            {
+                long? contentLenth;
+                if (loadRange.Length == null)
+                    contentLenth = ContentLength - (Range.Start ?? 0);
+                else
+                    contentLenth = loadRange.Length;
+                long? chunkStart = (Range.Start ?? 0) + contentLenth / Options.Chunks * _chunk.Index;
+                long? chunkEnd = (Range.Start ?? 0) + ((_chunk.Index + 1) * (contentLenth / Options.Chunks)) - 1;
+                chunkEnd = _chunk.Index + 1 == Options.Chunks ? loadRange.End : chunkEnd;
+                if (chunkStart != null || chunkEnd != null)
+                    msg.Headers.Range = new RangeHeaderValue(chunkStart + BytesWritten ?? 0, chunkEnd);
+            }
 
             msg.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36");
             return await RequestHandler.HttpClient.SendAsync(msg, HttpCompletionOption.ResponseHeadersRead, Token);
@@ -248,7 +346,7 @@ namespace DownloaderLibrary.Requests
             }
 
             string path = Path.Combine(Options.DestinationPath, fileName);
-            string tmpPath = Path.Combine(Options.TemporaryPath, fileName + ".part");
+            string tmpPath = Path.Combine(Options.TemporaryPath, fileName + TempExt);
             switch (Options.Mode)
             {
                 case LoadMode.Overwrite:
@@ -262,17 +360,17 @@ namespace DownloaderLibrary.Requests
                         break;
                     if (BytesWritten != null)
                         break;
-
                     int index = fileName.LastIndexOf('.');
                     string name = fileName;
                     for (int i = 1; File.Exists(path) || File.Exists(tmpPath); i++)
                     {
                         name = index != -1 ? fileName.Insert(index, $"({i})") : fileName + $"({i})";
                         path = Path.Combine(Options.DestinationPath, name);
-                        tmpPath = Path.Combine(Options.TemporaryPath, name + ".part");
+                        tmpPath = Path.Combine(Options.TemporaryPath, name + TempExt);
                     }
                     fileName = name;
-                    File.Create(path).Dispose();
+                    if (_chunk == null)
+                        File.Create(path).Dispose();
                     File.Create(tmpPath).Dispose();
                     break;
                 case LoadMode.Append:
@@ -280,10 +378,12 @@ namespace DownloaderLibrary.Requests
                     LoadFileInfo();
                     if (BytesWritten > ContentLength)
                     {
-                        File.Delete(path);
+                        File.Create(path).Dispose();
                         File.Delete(tmpPath);
                         BytesWritten = null;
                     }
+                    if (_chunk?.Index == 0)
+                        File.Create(path).Dispose();
                     break;
             }
             BytesWritten ??= 0;
@@ -293,10 +393,10 @@ namespace DownloaderLibrary.Requests
 
         private bool IsFinished()
         {
-            if (BytesWritten != 0 && BytesWritten != null && BytesWritten == ContentLength)
+            if (BytesWritten > 0 && BytesWritten == ContentLength)
             {
-                if (File.Exists(Path.Combine(Options.TemporaryPath, Options.FileName + ".part")))
-                    File.Move(Path.Combine(Options.TemporaryPath, Options.FileName + ".part"), Path.Combine(Options.DestinationPath, Options.FileName), true);
+                if (_chunk == null && File.Exists(Path.Combine(Options.TemporaryPath, Options.FileName + TempExt)))
+                    File.Move(Path.Combine(Options.TemporaryPath, Options.FileName + TempExt), Path.Combine(Options.DestinationPath, Options.FileName), true);
                 return true;
             }
             return false;
@@ -311,7 +411,7 @@ namespace DownloaderLibrary.Requests
         private async Task WriterAsync(HttpResponseMessage res)
         {
             using Stream? responseStream = await res.Content.ReadAsStreamAsync(Token);
-            using FileStream? fs = new(Path.Combine(Options.TemporaryPath, Options.FileName + ".part"), FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            using FileStream? fs = new(Path.Combine(Options.TemporaryPath, Options.FileName + TempExt), FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
             IProgress<float>? progress = ContentLength != null ? Options.Progress : null;
             while (State == RequestState.Running)
             {
@@ -326,18 +426,67 @@ namespace DownloaderLibrary.Requests
             await fs.FlushAsync();
         }
 
-
-        private static void CombineMultipleFiles(string inputDirectoryPath, string inputFileNamePattern, string outputFilePath)
+        private void CombineMultipleFiles()
         {
-            string[] inputFilePaths = Directory.GetFiles(inputDirectoryPath, inputFileNamePattern);
-            foreach (string inputFilePath in inputFilePaths)
+            if (_chunk == null)
+                return;
+            using FileStream destinationStream = new(Path.Combine(Options.DestinationPath, Options.FileName), FileMode.Append);
+            while (_chunk.Destinations.TryDequeue(out string? path, out byte i))
             {
-                using StreamWriter outputStream = File.AppendText(outputFilePath);
-                // Buffer size can be passed as the second argument.
-                outputStream.WriteLine(File.ReadAllText(inputFilePath));
+                byte[] tempFileBytes = File.ReadAllBytes(path);
+                destinationStream.Write(tempFileBytes, 0, tempFileBytes.Length);
+                File.Delete(path);
             }
         }
 
+
+        /// <summary>
+        /// Start the <see cref="Request"/> if it is not yet started or paused.
+        /// </summary>
+        public void Start(bool isOnly = false)
+        {
+            base.Start();
+            if (!isOnly)
+                _chunk?.Requests.ForEach(x => x.Start(true));
+        }
+        /// <summary>
+        /// Set the <see cref="Request"/> on hold.
+        /// </summary>
+        public void Pause(bool isOnly = false)
+        {
+            base.Pause();
+            if (!isOnly)
+                _chunk?.Requests.ForEach(x => x.Pause(true));
+        }
+
+        /// <summary>
+        /// Cancel the <see cref="Request"/>
+        /// </summary>
+        /// /// <exception cref="AggregateException"></exception>
+        /// /// <exception cref="ObjectDisposedException"></exception>
+        /// /// <exception cref="InvalidOperationException"></exception>
+        public void Cancel(bool isOnly = false)
+        {
+            base.Cancel();
+            if (!isOnly)
+                _chunk?.Requests.ForEach(x => x.Cancel(true));
+        }
+
+        /// <summary>
+        /// Wait to finish this <see cref="Request"/>.
+        /// </summary>
+        /// <exception cref="AggregateException"></exception>
+        /// <exception cref="ObjectDisposedException"></exception>
+        public void Wait(bool isOnly = false)
+        {
+            base.Wait();
+            if (!isOnly)
+                _chunk?.Requests.ForEach(x => x.Wait(true));
+        }
+
+
+
     }
+
 
 }

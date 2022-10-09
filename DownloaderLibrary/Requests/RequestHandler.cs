@@ -134,7 +134,6 @@ namespace DownloaderLibrary.Requests
         /// </summary>
         public void RunRequests()
         {
-
             if (IsRunning || CT.IsCancellationRequested)
                 return;
             IsRunning = true;
@@ -145,7 +144,6 @@ namespace DownloaderLibrary.Requests
                 Parallel.ForEach(_requestsToPerform.GetConsumingPartitioner(), new ParallelOptions() { MaxDegreeOfParallelism = MaxDegreeOfParallelism ?? Math.Min(Math.Max(AutoParallelism, 2), MaxParallelism) },
                     (pair, state) =>
                     {
-
                         Request request = pair.Value;
                         request.RunRequest();
                         if (request.State == RequestState.Compleated || request.State == RequestState.Failed)
@@ -161,6 +159,8 @@ namespace DownloaderLibrary.Requests
                             state.Break();
                     });
                 IsRunning = false;
+                if (_requestsToPerform.Count != 0)
+                    RunRequests();
             });
 
         }

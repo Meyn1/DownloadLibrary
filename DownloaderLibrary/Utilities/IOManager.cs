@@ -155,9 +155,9 @@ namespace DownloaderLibrary.Utilities
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern SafeFileHandle CreateFile(string lpFileName,
-FileSystemRights dwDesiredAccess, FileShare dwShareMode, IntPtr
-securityAttrs, FileMode dwCreationDisposition, FileOptions
-dwFlagsAndAttributes, IntPtr hTemplateFile);
+    FileSystemRights dwDesiredAccess, FileShare dwShareMode, IntPtr
+    securityAttrs, FileMode dwCreationDisposition, FileOptions
+    dwFlagsAndAttributes, IntPtr hTemplateFile);
 
         private const int ERROR_SHARING_VIOLATION = 32;
 
