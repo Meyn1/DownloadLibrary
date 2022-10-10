@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
-    <Title>DonwloadLibrary</Title>
+    <Title>DownloaderLibrary</Title>
     <Company>Shard</Company>
     <Description>A free to use library as wrapper around the HttpClient.
 All Requests will be handled by an PriorityQueue in a Parallel state to have a simple and efficient way to handle many (Tested with more than 100+) Http Requests without delay. Also includes retry, priority function and second (Download) thread for larger files.
@@ -20,17 +20,17 @@ Contains at the moment:
     <PackageId>Shard.DonwloadLibrary</PackageId>
     <Authors>Meyn</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>Request, FreeToUse, HttpClient, producer-consumer, file-downloader, downloader, http,  .Net, WPF, Console, Document, PriorityQueue, downloadmanagement, Json, CSV, download-filestream, IProgress,</PackageTags>
+    <PackageTags>Request, FreeToUse, HttpClient, producer-consumer, file-downloader, downloader, chunk, http,  .Net, WPF, Console, Document, PriorityQueue, downloadmanagement, Json, CSV, download-filestream, IProgress,</PackageTags>
     <PackageIcon>logo.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Fixed issue with LoadRequest resume</PackageReleaseNotes>
+    <PackageReleaseNotes>Implements Chunks</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <PackageProjectUrl>https://github.com/Meyn1/DownloadLibrary</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Meyn1/DownloadLibrary</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <Version>1.0.2</Version>
+    <Version>1.0.2.2</Version>
   </PropertyGroup>
 
   <ItemGroup>

@@ -50,15 +50,13 @@ namespace DownloaderLibrary.Requests
         }
 
         /// <summary>
-        /// Chunks in that the request sould be downloaded
-        /// (Only if server supports it)
-        /// You Can not stop and Resume if this function is used!
-        /// Help to implement this function on GitHub please!
+        /// Chunks the <see cref="LoadRequest"/> and partial downloads the file
+        /// <para>(Only if server supports it)</para>
         /// </summary>
         public byte Chunks { get; set; }
 
         /// <summary>
-        /// Sets the download range of the Load request
+        /// Sets the download range of th<see cref="LoadRequest"/> 
         /// Start can not be used with LoadMode.Append it will switch to LoadMode.Create
         /// </summary>
         public Range Range { get; set; }

@@ -28,7 +28,7 @@ At the moment:
   - Monitor the progress of the download with `IProgress<float>`
   - Can set path and filename 
   - Download a specified range of a file
-  - Part a file into chunks but is not recommended (please help to update)
+  - Download a file into chunks
   - Exclude extensions for savety _(.exe; .bat.; etc...)_
 
 > Expand and use as you like!
@@ -41,7 +41,7 @@ Repository: https://github.com/Meyn1/DownloadLibrary
 
 Installation over [NuGet](https://www.nuget.org/packages/Shard.DonwloadLibrary) Packagemanager in Visual Studio or online.
 URL: https://www.nuget.org/packages/Shard.DonwloadLibrary.
-Package Manager Console: PM> NuGet\Install-Package Shard.DonwloadLibrary -Version 1.0.2
+Package Manager Console: PM> NuGet\Install-Package Shard.DonwloadLibrary -Version 1.0.2.2
 
 ## How to use
 
@@ -53,7 +53,7 @@ Then create a new `Request` object like this `LoadRequest`
 This `LoadRequest` downloads a file into the downloads folder of the PC with an ".part" file and uses the name that the server provides.
 ```cs
 //To download a file and store it in "Downloads" folder
-new LoadRequest("[Your URL]"); // e.g. https://speed.hetzner.de/100MB.bin
+new LoadRequest("[Your URL]"); // e.g. https://www.sample-videos.com/video123/mkv/240/big_buck_bunny_240p_30mb.mkv
 ```
 To set options on the `Request` create a `RequestOption` or for a `LoadRequest` a `LoadRequestOption`
 ```cs
@@ -73,7 +73,9 @@ To set options on the `Request` create a `RequestOption` or for a `LoadRequest` 
             //Resume function only available with append!
             Mode = LoadMode.Create, 
             // Progress that writes the % to the Console
-            Progress = new Progress<float>((percent => Console.WriteLine(percent + "%"))) 
+             Progress = new Progress<float>(f => Console.WriteLine((f).ToString("0.0%"))),
+             //Chunk a file to download faster
+             Chunks = 3
         };
 ```
 And use it in the Request
