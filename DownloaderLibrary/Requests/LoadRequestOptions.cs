@@ -39,6 +39,12 @@ namespace DownloaderLibrary.Requests
         /// </summary>
         public IProgress<float>? Progress { get; set; } = null;
 
+        /// <summary>
+        /// Add Headers to the <see cref="LoadRequest"/> like a useragend
+        /// <para>e.g. Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36");</para>
+        /// </summary>
+        public Dictionary<string, string> Headers = new();
+
         private string _fileName = string.Empty;
         /// <summary>
         /// Filename of the file that will be created and be written to.
@@ -114,6 +120,7 @@ namespace DownloaderLibrary.Requests
             Progress = options.Progress;
             Chunks = options.Chunks;
             Range = options.Range;
+            Headers = options.Headers;
             _fileName = options.FileName;
             _temporaryPath = options.TemporaryPath;
             _destinationPath = options.DestinationPath;

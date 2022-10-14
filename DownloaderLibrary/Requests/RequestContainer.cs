@@ -18,6 +18,11 @@
             foreach (Request? request in requests)
                 Add(request);
         }
+        /// <summary>
+        /// Get all <see cref="Request"/> in this Container
+        /// </summary>
+        /// <returns>returns a <see cref="Request"/> array</returns>
+        public Request[] GetRequests() => _requests.ToArray();
 
         /// <summary>
         /// Creates a new <see cref="RequestContainer"/> that megres  <see cref="RequestContainer"/> together.
@@ -54,6 +59,15 @@
 
             _requests.Add(request);
         }
+        /// <summary>
+        /// Removes a <see cref="Request"/> from this container.
+        /// </summary>
+        /// <param name="requests">Request to remove</param>
+        public void Remove(params Request[] requests) =>
+        Array.ForEach(requests, request =>
+            _requests.Remove(request));
+
+
         /// <summary>
         /// Cancel all <see cref="Request"/> in container
         /// </summary>

@@ -186,7 +186,7 @@
                     State = RequestState.Available;
                 else
                     State = RequestState.Failed;
-            if (State == RequestState.Compleated || State == RequestState.Failed)
+            if (State == RequestState.Compleated || State == RequestState.Failed || State == RequestState.Cancelled)
                 _isFinished.TrySetResult();
         }
 

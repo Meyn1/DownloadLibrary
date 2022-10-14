@@ -162,8 +162,10 @@ namespace DownloaderLibrary.Requests
                 Requests = new() { this },
                 Index = 0,
                 Destinations = new(Options.Chunks),
+                OnCompleated = Options.CompleatedAction,
                 Progress = progress != null ? new float[Options.Chunks] : null
             };
+            Options.CompleatedAction = null;
 
             if (_chunk.Progress != null)
                 Options.Progress = new Progress<float>(f =>
@@ -331,7 +333,7 @@ namespace DownloaderLibrary.Requests
                 {
                     _chunk.Destinations.Enqueue(TmpDestination, _chunk.Index);
                     if (_chunk.Destinations.Count == _chunk.Requests.Count)
-                        CombineMultipleFilesIntoSingleFile();
+                        CombineMultipleFiles();
                 }
             }
         }
@@ -368,7 +370,11 @@ namespace DownloaderLibrary.Requests
             if (loadRange.Length != null || loadRange.Start != 0)
                 msg.Headers.Range = new RangeHeaderValue(loadRange.Start, loadRange.End);
 
-            msg.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36");
+            if (!Options.Headers.ContainsKey("User-Agent"))
+                msg.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36");
+            foreach (KeyValuePair<string, string> keyValuePair in Options.Headers)
+                msg.Headers.Add(keyValuePair.Key, keyValuePair.Value);
+
             if (State != RequestState.Running)
                 return new();
             return await RequestHandler.HttpClient.SendAsync(msg, HttpCompletionOption.ResponseHeadersRead, Token);
@@ -482,9 +488,8 @@ namespace DownloaderLibrary.Requests
             await fs.FlushAsync();
         }
 
-        private void CombineMultipleFilesIntoSingleFile()
+        private void CombineMultipleFiles()
         {
-
             if (_chunk == null)
                 return;
             string startFile = _chunk.Destinations.Dequeue();
@@ -502,7 +507,8 @@ namespace DownloaderLibrary.Requests
             }
             for (int i = 0; i < _chunk?.Progress?.Length; i++)
                 _chunk.Progress[i] = 1f;
-
+            _chunk!.OnCompleated?.Invoke(_chunk.Requests[0].Destination);
+            Options.Progress?.Report(1f);
         }
 
         /// <summary>
