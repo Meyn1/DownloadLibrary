@@ -11,7 +11,7 @@ namespace DownloaderLibrary.Requests
         /// <summary>
         /// Main Instance of the <see cref="HttpClient"/> that will be used to handle all <see cref="Request.Request"/> objects.
         /// </summary>
-        public static HttpClient HttpClient { get; } = new();
+        public static HttpClient HttpClient { get; set; } = new();
 
         private readonly BlockingCollection<KeyValuePair<int, Request>> _requestsToPerform = new(new Utilities.PriorityQueue<int, Request>(3));
         /// <summary>

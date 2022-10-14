@@ -23,7 +23,7 @@ Contains at the moment:
     <PackageTags>Request, FreeToUse, HttpClient, producer-consumer, file-downloader, downloader, chunk, http,  .Net, WPF, Console, Document, PriorityQueue, downloadmanagement, Json, CSV, download-filestream, IProgress,</PackageTags>
     <PackageIcon>logo.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Implements Chunks</PackageReleaseNotes>
+    <PackageReleaseNotes>Improved file merging</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>

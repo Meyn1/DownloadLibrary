@@ -331,7 +331,7 @@ namespace DownloaderLibrary.Requests
                 {
                     _chunk.Destinations.Enqueue(TmpDestination, _chunk.Index);
                     if (_chunk.Destinations.Count == _chunk.Requests.Count)
-                        CombineMultipleFiles();
+                        CombineMultipleFilesIntoSingleFile();
                 }
             }
         }
@@ -427,7 +427,7 @@ namespace DownloaderLibrary.Requests
                     int index = fileName.LastIndexOf('.');
                     string name = fileName;
 
-                    for (int i = 1; (File.Exists(Destination) && (_chunk?.Requests[0].Destination ?? Destination) == Destination) || File.Exists(TmpDestination); i++)
+                    for (int i = 1; (File.Exists(Destination) && (_chunk?.Index ?? 0) == 0) || File.Exists(TmpDestination); i++)
                     {
                         name = index != -1 ? fileName.Insert(index, $"({i})") : fileName + $"({i})";
                         Destination = Path.Combine(Options.DestinationPath, name);
@@ -482,22 +482,27 @@ namespace DownloaderLibrary.Requests
             await fs.FlushAsync();
         }
 
-        private void CombineMultipleFiles()
+        private void CombineMultipleFilesIntoSingleFile()
         {
+
             if (_chunk == null)
                 return;
-            using FileStream destinationStream = new(Path.Combine(Options.DestinationPath, Options.FileName), FileMode.Append);
-            while (_chunk.Destinations.TryDequeue(out string? path, out byte i))
+            string startFile = _chunk.Destinations.Dequeue();
+            File.Move(startFile, _chunk.Requests[0].Destination, true);
+            string[] inputFilePaths = new string[_chunk.Destinations.Count];
+            for (int i = 0; _chunk.Destinations.Count != 0; i++)
+                inputFilePaths[i] = _chunk.Destinations.Dequeue();
+            using FileStream outputStream = new(_chunk.Requests[0].Destination, FileMode.Append);
+            foreach (string inputFilePath in inputFilePaths)
             {
-                if (!File.Exists(path))
-                    return;
-                byte[] tempFileBytes = File.ReadAllBytes(path);
-                destinationStream.Write(tempFileBytes, 0, tempFileBytes.Length);
-                File.Delete(path);
+                using FileStream inputStream = File.OpenRead(inputFilePath);
+                inputStream.CopyTo(outputStream);
+                inputStream.Close();
+                File.Delete(inputFilePath);
             }
             for (int i = 0; i < _chunk?.Progress?.Length; i++)
                 _chunk.Progress[i] = 1f;
-            Options?.Progress?.Report(1);
+
         }
 
         /// <summary>
