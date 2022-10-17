@@ -7,7 +7,7 @@
     <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
     <Title>DownloaderLibrary</Title>
     <Company>Shard</Company>
-    <Description>A free to use library as wrapper around the HttpClient.
+    <Description>A free to use library as wrapper around the HttpClient to use as a download manager or easy producer consumer implementation.
 All Requests will be handled by an PriorityQueue in a Parallel state to have a simple and efficient way to handle many (Tested with more than 100+) Http Requests without delay. Also includes retry, priority function and second (Download) thread for larger files.
 
 Contains at the moment:
@@ -23,14 +23,14 @@ Contains at the moment:
     <PackageTags>Request, FreeToUse, HttpClient, producer-consumer, file-downloader, downloader, chunk, http,  .Net, WPF, Console, Document, PriorityQueue, downloadmanagement, Json, CSV, download-filestream, IProgress,</PackageTags>
     <PackageIcon>logo.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Improved file merging</PackageReleaseNotes>
+    <PackageReleaseNotes>Includes delay for Request deploying</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <PackageProjectUrl>https://github.com/Meyn1/DownloadLibrary</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Meyn1/DownloadLibrary</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <Version>1.0.2.2</Version>
+    <Version>1.0.2.3</Version>
   </PropertyGroup>
 
   <ItemGroup>

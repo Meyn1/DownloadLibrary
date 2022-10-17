@@ -45,6 +45,11 @@
             }
         }
         private bool _isDownload = false;
+
+        /// <summary>
+        /// Delays the start of the <see cref="Request"/> on every Start call for the specified number of milliseconds.
+        /// </summary>
+        public int DeployDelay = 0;
         /// <summary>
         /// If the <see cref="Request"/> is an big file and sold download in a second  <see cref="Thread"/>.
         /// </summary>

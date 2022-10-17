@@ -74,6 +74,10 @@
         /// <see cref="System.Threading.Tasks.Task"/> that indicates of this <see cref="Request"/> finished.
         /// </summary>
         public Task Task => _isFinished.Task;
+        /// <summary>
+        /// Delays the start of the <see cref="Request"/> on every Start call for the specified number of milliseconds.
+        /// </summary>
+        public int DeployDelay { get => Options.DeployDelay; set => Options.DeployDelay = value; }
 
         /// <summary>
         /// The <see cref="RequestState"/> of this <see cref="Request"/>.
@@ -204,7 +208,15 @@
             if (State != RequestState.Onhold)
                 return;
             State = RequestState.Available;
-            Options.RequestHandler.RunRequests(this);
+            if (DeployDelay > 0)
+                Task.Run(() =>
+                {
+                    Task.Delay(DeployDelay);
+                    if (State == RequestState.Available)
+                        Options.RequestHandler.RunRequests(this);
+                });
+            else
+                Options.RequestHandler.RunRequests(this);
         }
         /// <summary>
         /// Set the <see cref="Request"/> on hold.
