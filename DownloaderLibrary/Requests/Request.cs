@@ -145,10 +145,11 @@
                 _cts.Dispose();
             _disposed = true;
         }
+
         /// <summary>
         /// Runs the <see cref="Request"/> that was created out this object
         /// </summary>
-        internal void RunRequest()
+        internal async Task StartRequestAsync()
         {
             lock (this)
             {
@@ -171,7 +172,7 @@
             bool compleated = false;
             try
             {
-                compleated = RunRequestAsync().Result;
+                compleated = await RunRequestAsync();
             }
             catch (OperationCanceledException)
             {

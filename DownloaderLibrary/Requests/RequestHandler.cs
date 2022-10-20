@@ -13,7 +13,7 @@ namespace DownloaderLibrary.Requests
         /// </summary>
         public static HttpClient HttpClient { get; set; } = new();
 
-        private readonly BlockingCollection<KeyValuePair<int, Request>> _requestsToPerform = new(new Utilities.PriorityQueue<int, Request>(3));
+        private readonly PriorityChannel<Request> _requestsToPerform = new(3);
         /// <summary>
         /// Indicates if the <see cref="RequestHandler"/>.is running
         /// </summary>
@@ -22,7 +22,16 @@ namespace DownloaderLibrary.Requests
         /// Sets the max degreee of parallel requests that will be handled. 
         /// Default is null the DownloadHanlder will handle it automaticly.
         /// </summary>
-        public byte? MaxDegreeOfParallelism { get; set; } = null;
+        public byte? MaxDegreeOfParallelism
+        {
+            get => _maxDegreeOfParallelism; set
+            {
+                _parallelOptions.MaxDegreeOfParallelism = value ?? Math.Min(Math.Max(AutoParallelism, 2), MaxParallelism);
+                _maxDegreeOfParallelism = value;
+            }
+        }
+        private byte? _maxDegreeOfParallelism = null;
+        private readonly DynamicParallelOptions _parallelOptions = new();
 
         private int AutoParallelism => (int)(Environment.ProcessorCount * IOManager.BytesToMegabytes(Speed));
         private static int MaxParallelism => (int)(Environment.ProcessorCount / 1.7f);
@@ -57,7 +66,7 @@ namespace DownloaderLibrary.Requests
         /// <summary>
         /// Requests that are not yet Handeled
         /// </summary>
-        public int CountRequests => _requestsToPerform.Count;
+        public int CountRequests => _requestsToPerform.Reader.Count;
 
         /// <summary>
         /// Constructor for <see cref="RequestHandler"/> class.
@@ -68,9 +77,28 @@ namespace DownloaderLibrary.Requests
         /// <summary>
         /// Adds Requests to the handler
         /// </summary>
+        /// <param name="request">Requests that sould be added</param>
+        public void AddRequest(Request request)
+        => _requestsToPerform.Writer.WriteAsync(new((int)request.Options.PriorityLevel, request));
+
+
+        /// <summary>
+        /// Adds Requests to the handler
+        /// </summary>
         /// <param name="requests">Requests that sould be added</param>
         public void AddRequest(params Request[] requests)
-        => Array.ForEach(requests, request => _requestsToPerform.Add(new((int)request.Options.PriorityLevel, request)));
+        => Array.ForEach(requests, request => _requestsToPerform.Writer.WriteAsync(new((int)request.Options.PriorityLevel, request)));
+
+
+        /// <summary>
+        /// Runs the Request and adds Requests
+        /// </summary>
+        /// <param name="request">Requests that sould be added</param>
+        public void RunRequests(Request request)
+        {
+            AddRequest(request);
+            RunRequests();
+        }
 
         /// <summary>
         /// Runs the Request and adds Requests
@@ -128,6 +156,8 @@ namespace DownloaderLibrary.Requests
             if (_speedQuene.Count > 20)
                 _speedQuene.TryDequeue(out _);
             _speedQuene.Enqueue(bytesPerSecond);
+            if (MaxDegreeOfParallelism == null)
+                _parallelOptions.MaxDegreeOfParallelism = Math.Min(Math.Max(AutoParallelism, 2), MaxParallelism);
         }
         /// <summary>
         /// Runs the Request if it is not running
@@ -140,29 +170,71 @@ namespace DownloaderLibrary.Requests
 
             Task.Run(() =>
             {
-                int i = 0;
-                Parallel.ForEach(_requestsToPerform.GetConsumingPartitioner(), new ParallelOptions() { MaxDegreeOfParallelism = MaxDegreeOfParallelism ?? Math.Min(Math.Max(AutoParallelism, 2), MaxParallelism) },
-                    (pair, state) =>
-                    {
-                        Request request = pair.Value;
-                        request.RunRequest();
-                        if (request.State == RequestState.Compleated || request.State == RequestState.Failed || request.State == RequestState.Cancelled)
-                            request.Dispose();
-                        else if (request.State == RequestState.Onhold)
-                            _requestsToPerform.Add(pair);
-                        else if (request.State == RequestState.Available)
-                            _requestsToPerform.Add(pair);
+                bool breakFlag = false;
+                DynamicParallelForEachAsync(_requestsToPerform.Reader.ReadAllAsync().TakeWhile(_ => !Volatile.Read(ref breakFlag)), _parallelOptions, async (pair, ct) =>
+                {
+                    Request request = pair.item;
+                    await request.StartRequestAsync();
+                    if (request.State == RequestState.Compleated || request.State == RequestState.Failed || request.State == RequestState.Cancelled)
+                        request.Dispose();
+                    else if (request.State == RequestState.Available)
+                        _ = _requestsToPerform.Writer.WriteAsync(pair);
 
-                        if (CT.IsCancellationRequested)
-                            state.Stop();
-                        if (i++ > 50 && _requestsToPerform.Count == 0)
-                            state.Break();
-                    });
+                    if (CT.IsCancellationRequested)
+                        Volatile.Write(ref breakFlag, true);
+                });
+
                 IsRunning = false;
-                if (_requestsToPerform.Count != 0)
+                if (_requestsToPerform.Reader.Count != 0)
                     RunRequests();
             });
 
         }
+
+
+        /// <summary>
+        /// Executes a parallel for-each operation on an async-enumerable sequence,
+        /// enforcing a dynamic maximum degree of parallelism.
+        /// </summary>
+        private static Task DynamicParallelForEachAsync<TSource>(IAsyncEnumerable<TSource> source, DynamicParallelOptions options, Func<TSource, CancellationToken, ValueTask> body)
+        {
+            _ = source ?? throw new ArgumentNullException(nameof(source));
+            _ = options ?? throw new ArgumentNullException(nameof(options));
+            _ = body ?? throw new ArgumentNullException(nameof(body));
+
+            SemaphoreSlim throttler = new(options.MaxDegreeOfParallelism);
+            options.DegreeOfParallelismChangedDelta += Options_ChangedDelta;
+            void Options_ChangedDelta(object? sender, int delta)
+            {
+                if (delta > 0)
+                    throttler.Release(delta);
+                else
+                    for (int i = delta; i < 0; i++) throttler.WaitAsync();
+            }
+
+            async IAsyncEnumerable<TSource> GetThrottledSource()
+            {
+                await foreach (TSource? item in source.ConfigureAwait(false))
+                {
+                    await throttler.WaitAsync().ConfigureAwait(false);
+                    yield return item;
+                }
+            }
+
+            return Parallel.ForEachAsync(GetThrottledSource(), options, async (item, ct) =>
+            {
+                try { await body(item, ct).ConfigureAwait(false); }
+                finally { throttler.Release(); }
+            }).ContinueWith(t =>
+            {
+                options.DegreeOfParallelismChangedDelta -= Options_ChangedDelta;
+                return t;
+            }, default, TaskContinuationOptions.DenyChildAttach, TaskScheduler.Default)
+                .Unwrap();
+        }
+
     }
+
+
+
 }

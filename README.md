@@ -3,7 +3,7 @@
 
 
 The Shard Download Library is an on .Net 6.0 based wrapper around the `HttpClient` to manage your HTTP requests. But it can also be used without the `HttpClient` to handle CPU intensive tasks.
-All `Requests` will be handled by an `PriorityQueue` in a Parallel state to have a simple and efficient way to handle many (tested with more than 1000) HTTP Requests.
+All `Requests` will be handled by an `PriorityChannel` in a Parallel asyncron state to have a simple and efficient way to handle many (tested with more than 1000) HTTP Requests.
 
 - Easy to use!
 - Efficient 
@@ -41,7 +41,7 @@ Repository: https://github.com/Meyn1/DownloadLibrary
 
 Installation over [NuGet](https://www.nuget.org/packages/Shard.DonwloadLibrary) Package manager in Visual Studio or online.
 URL: https://www.nuget.org/packages/Shard.DonwloadLibrary.
-Package Manager Console: PM> NuGet\Install-Package Shard.DonwloadLibrary -Version 1.0.2.2
+Package Manager Console: PM> NuGet\Install-Package Shard.DonwloadLibrary -Version 1.0.3
 
 ## How to use
 
