@@ -146,7 +146,7 @@ namespace DownloaderLibrary.Requests
                     {
                         Request request = pair.Value;
                         request.RunRequest();
-                        if (request.State == RequestState.Compleated || request.State == RequestState.Failed)
+                        if (request.State == RequestState.Compleated || request.State == RequestState.Failed || request.State == RequestState.Cancelled)
                             request.Dispose();
                         else if (request.State == RequestState.Onhold)
                             _requestsToPerform.Add(pair);

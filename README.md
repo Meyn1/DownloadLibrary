@@ -2,12 +2,12 @@
 ## _Shard HttpClient Library to handle Requests_
 
 
-The Shard DownloadLibrary is an on .Net 6.0 based wrapper around the `HttpClient` to manage your HttpRequests. But it can also be used without the `HttpClient` to handle CPU intensive tasks.
-All `Requests` will be handled by an `PriorityQueue` in a Parallel state to have a simple and efficient way to handle many (Tested with more than 500+) Http Requests.
+The Shard Download Library is an on .Net 6.0 based wrapper around the `HttpClient` to manage your HTTP requests. But it can also be used without the `HttpClient` to handle CPU intensive tasks.
+All `Requests` will be handled by an `PriorityQueue` in a Parallel state to have a simple and efficient way to handle many (tested with more than 1000) HTTP Requests.
 
 - Easy to use!
 - Efficient 
-- ✨Contains file downloader! ✨
+- ✨ Contains file downloader! ✨
 
 ## Features
 At the moment:
@@ -16,46 +16,46 @@ At the moment:
 - **RequestContainer** A container class to merge requests together and to start, pause and await them.
 - **Request:** Main abstract class that can be used to expand functionality on class-based level.
     - All subclasses have a retry function
-    - A compleated and failed event
-    - A priority funtcion
-    - A second thread for bigger files to hold the app responsiv
+    - A completed and failed event
+    - A priority function
+    - A second thread for bigger files to hold the app responsive
     - Implementation for custom `CancellationToken` and a main `CancellationTokenSource` on `Downloader` to cancel all downloads
 - **LoadRequest:** To download the response content into files.
-  - This is a Http file downloader with this functions:
+  - This is an HTTP file downloader with these functions:
   - *Pause* and *Start* a download
   - *Resume* a download
-  - Gets the *file name* and *extension* from the server 
+  - Get the *file name* and *extension* from the server 
   - Monitor the progress of the download with `IProgress<float>`
   - Can set path and filename 
   - Download a specified range of a file
   - Download a file into chunks
-  - Exclude extensions for savety _(.exe; .bat.; etc...)_
+  - Exclude extensions for safety _(.exe; .bat.; etc...)_
 
 > Expand and use as you like!
 
 ## Tech
-Is available on GitHub:
+It is available on GitHub:
 Repository: https://github.com/Meyn1/DownloadLibrary
 
 ## Installation
 
-Installation over [NuGet](https://www.nuget.org/packages/Shard.DonwloadLibrary) Packagemanager in Visual Studio or online.
+Installation over [NuGet](https://www.nuget.org/packages/Shard.DonwloadLibrary) Package manager in Visual Studio or online.
 URL: https://www.nuget.org/packages/Shard.DonwloadLibrary.
 Package Manager Console: PM> NuGet\Install-Package Shard.DonwloadLibrary -Version 1.0.2.2
 
 ## How to use
 
-Import the Library
+Import the Library.
 ```cs
 using DownloaderLibrary.Requests;
 ```
-Then create a new `Request` object like this `LoadRequest`
-This `LoadRequest` downloads a file into the downloads folder of the PC with an ".part" file and uses the name that the server provides.
+Then create a new `Request` object like this `LoadRequest`.
+This `LoadRequest` downloads a file into the download's folder of the PC with a ".part" file and uses the name that the server provides.
 ```cs
 //To download a file and store it in "Downloads" folder
 new LoadRequest("[Your URL]"); // e.g. https://www.sample-videos.com/video123/mkv/240/big_buck_bunny_240p_30mb.mkv
 ```
-To set options on the `Request` create a `RequestOption` or for a `LoadRequest` a `LoadRequestOption`
+To set options on the `Request` create a `RequestOption` or for a `LoadRequest` a `LoadRequestOption`.
 ```cs
 // Create an option for a LoadRequest
   LoadRequestOptions requestOptions = new()
@@ -69,21 +69,21 @@ To set options on the `Request` create a `RequestOption` or for a `LoadRequest` 
             Path = "C:\\Users\\[Your Username]\\Desktop", 
             // If this Request contains a heavy request put it in second thread (default is false)
             IsDownload = true,
-            //If the downloader sould Override, Create a new file or Append (default is Append)
+            //If the downloader should Override, Create a new file or Append (default is Append)
             //Resume function only available with append!
             Mode = LoadMode.Create, 
             // Progress that writes the % to the Console
-             Progress = new Progress<float>(f => Console.WriteLine((f).ToString("0.0%"))),
-             //Chunk a file to download faster
-             Chunks = 3
+            Progress = new Progress<float>(f => Console.WriteLine((f).ToString("0.0%"))),
+            //Chunk a file to download faster
+            Chunks = 3
         };
 ```
-And use it in the Request
+And use it in the request.
 ```cs
 //To download a file and store it on the Desktop with a different name
 new LoadRequest(" https://speed.hetzner.de/100MB.bin",requestOptions);
 ```
-To wait on the Request use *await* or *WaitToFinish();*
+To wait on the request, use *await* or *WaitToFinish();*.
 ```cs
 await new LoadRequest(" https://speed.hetzner.de/100MB.bin",requestOptions).Task;
 //new LoadRequest(" https://speed.hetzner.de/100MB.bin",requestOptions).WaitToFinish();
@@ -93,25 +93,25 @@ Create an `OwnRequest` like this:
     //Create an object that passes a CancellationToken
    new OwnRequest((downloadToken) =>
         {
-            //Create your Request Massage. Here the body of google.com
+            //Create your request Message. Here the body of google.com
             HttpRequestMessage requestMessage = new(HttpMethod.Get, "https://www.google.com");
             //Send your request and get the result. Pass the CancellationToken for handling it later over the Request object
             var response = DownloadHandler.Instance.SendAsync(requestMessage, downloadToken).Result;
-            //If the resposne does not succeed
+            //If the response does not succeed
             if (!response.IsSuccessStatusCode)
                 return false; // Return false to retry and call the failed method
             //If the response succeed. Do what you want and return to to finish the request
-            Console.WriteLine("Finsihed");
+            Console.WriteLine("Finished");
             return true;
         });
 ```
-To Create your own `Request` child. Here the implementation of the `OwnRequest` class:
+To create your own `Request` child. Here is the implementation of the `OwnRequest` class:
 ```cs
     public class OwnRequest : Request
     {
         private readonly Func<CancellationToken, Task<bool>> _own;
         
-        //Parent sets the Url field but doesn't need it and doesn't require a RequestOption because it creates then a new one.
+        //Parent sets the URL field but doesn't need it and doesn't require a RequestOption because it creates then a new one.
         //But to use the options it have to be passed over to the parent
         public OwnRequest(Func<CancellationToken, Task<bool>> own, RequestOptions? requestOptions = null) : base(string.Empty, requestOptions)
         {

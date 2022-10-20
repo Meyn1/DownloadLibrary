@@ -178,7 +178,8 @@
 
             }
             catch (Exception) { }
-            if (State == RequestState.Running || State == RequestState.Cancelled)
+
+            if (State == RequestState.Running)
                 if (compleated)
                     State = RequestState.Compleated;
                 else if (Token.IsCancellationRequested)
@@ -190,6 +191,7 @@
                     State = RequestState.Available;
                 else
                     State = RequestState.Failed;
+
             if (State == RequestState.Compleated || State == RequestState.Failed || State == RequestState.Cancelled)
                 _isFinished.TrySetResult();
         }

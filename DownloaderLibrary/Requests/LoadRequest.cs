@@ -22,7 +22,6 @@ namespace DownloaderLibrary.Requests
 
         private Range Range => Options.Range;
 
-
         private Chunk? _chunk;
 
         private string Destination { get; set; } = string.Empty;
@@ -159,11 +158,12 @@ namespace DownloaderLibrary.Requests
             IProgress<float>? progress = Options.Progress;
             _chunk = new()
             {
-                Requests = new() { this },
+                Requests = new(Options.Chunks) { this },
                 Index = 0,
-                Destinations = new(Options.Chunks),
+                Destinations = new string[Options.Chunks],
                 OnCompleated = Options.CompleatedAction,
-                Progress = progress != null ? new float[Options.Chunks] : null
+                Progress = progress != null ? new float[Options.Chunks] : null,
+                MainProgress = progress
             };
             Options.CompleatedAction = null;
 
@@ -179,10 +179,10 @@ namespace DownloaderLibrary.Requests
 
             TempExt = "_0.chunk";
             for (byte i = 1; i < Options.Chunks; i++)
-                _chunk.Requests.Add(new LoadRequest(_chunk, this, i, progress));
+                _chunk.Requests.Add(new LoadRequest(_chunk, this, i));
         }
 
-        private LoadRequest(Chunk chunk, LoadRequest startRequest, byte index, IProgress<float>? progress) : base(startRequest._url, null)
+        private LoadRequest(Chunk chunk, LoadRequest startRequest, byte index) : base(startRequest._url, null)
         {
             _contentLength = startRequest._contentLength;
 
@@ -194,6 +194,7 @@ namespace DownloaderLibrary.Requests
                 Index = index,
                 Destinations = chunk.Destinations,
                 Progress = chunk.Progress,
+                MainProgress = chunk.MainProgress
             };
             if (_chunk.Progress != null)
                 Options.Progress = new Progress<float>(f =>
@@ -201,7 +202,7 @@ namespace DownloaderLibrary.Requests
                     lock (_chunk.Progress)
                     {
                         _chunk.Progress[_chunk.Index] = f;
-                        progress?.Report(_chunk.Progress.Average());
+                        _chunk.MainProgress?.Report(_chunk.Progress.Average());
                     }
                 });
             TempExt = $"_{index}.chunk";
@@ -291,23 +292,41 @@ namespace DownloaderLibrary.Requests
                     _contentLength = new(length);
             }
 
+
             long tmpBytesWritten = 0;
             if (res.StatusCode != System.Net.HttpStatusCode.PartialContent)
             {
                 if (_chunk != null)
                 {
-                    Cancel();
-                    foreach (LoadRequest request in _chunk.Requests)
-                        if (File.Exists(request.TmpDestination))
-                            File.Delete(request.TmpDestination);
-                    TempExt = ".part";
-                    _chunk = null;
+                    for (int i = 0; i < _chunk?.Requests.Count; i++)
+                    {
+                        LoadRequest req = _chunk.Requests[i];
+                        if (i == 0)
+                        {
+                            req.Options.Progress = _chunk?.MainProgress;
+                            req._chunk = null;
+                            req.TempExt = ".part";
+                        }
+                        else if (i != _chunk.Index)
+                            req.Cancel(true);
+
+                        if (File.Exists(req.TmpDestination))
+                            File.Delete(req.TmpDestination);
+                    }
+
+                    if (_chunk != null)
+                    {
+                        Cancel(true);
+                        return new(true, res);
+                    }
                 }
+
                 File.Create(TmpDestination).Dispose();
                 BytesWritten = 0;
             }
             else
                 tmpBytesWritten = BytesWritten ?? 0;
+
             if (!File.Exists(Destination) && (_chunk?.Index == 0 || _chunk == null))
                 File.Create(Destination).Dispose();
 
@@ -326,16 +345,14 @@ namespace DownloaderLibrary.Requests
         private void Copy()
         {
             if (State == RequestState.Running)
-            {
                 if (_chunk == null)
                     File.Move(TmpDestination, Destination, true);
                 else
                 {
-                    _chunk.Destinations.Enqueue(TmpDestination, _chunk.Index);
-                    if (_chunk.Destinations.Count == _chunk.Requests.Count)
+                    _chunk.Destinations[_chunk.Index] = TmpDestination;
+                    if (Array.TrueForAll(_chunk.Destinations, x => !string.IsNullOrEmpty(x)))
                         CombineMultipleFiles();
                 }
-            }
         }
 
         private bool IsFinished()
@@ -343,7 +360,7 @@ namespace DownloaderLibrary.Requests
             if (BytesWritten > 0 && BytesWritten == ContentLength)
             {
                 if (_chunk != null)
-                    _chunk.Destinations.Enqueue(TmpDestination, _chunk.Index);
+                    _chunk.Destinations[_chunk.Index] = TmpDestination;
                 else if (File.Exists(TmpDestination))
                     File.Move(TmpDestination, Destination, true);
                 return true;
@@ -492,11 +509,9 @@ namespace DownloaderLibrary.Requests
         {
             if (_chunk == null)
                 return;
-            string startFile = _chunk.Destinations.Dequeue();
+            string startFile = _chunk.Destinations[0];
             File.Move(startFile, _chunk.Requests[0].Destination, true);
-            string[] inputFilePaths = new string[_chunk.Destinations.Count];
-            for (int i = 0; _chunk.Destinations.Count != 0; i++)
-                inputFilePaths[i] = _chunk.Destinations.Dequeue();
+            string[] inputFilePaths = _chunk.Destinations[1..];
             using FileStream outputStream = new(_chunk.Requests[0].Destination, FileMode.Append);
             foreach (string inputFilePath in inputFilePaths)
             {

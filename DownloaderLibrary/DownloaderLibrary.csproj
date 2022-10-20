@@ -23,14 +23,14 @@ Contains at the moment:
     <PackageTags>Request, FreeToUse, HttpClient, producer-consumer, file-downloader, downloader, chunk, http,  .Net, WPF, Console, Document, PriorityQueue, downloadmanagement, Json, CSV, download-filestream, IProgress,</PackageTags>
     <PackageIcon>logo.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Includes delay for Request deploying</PackageReleaseNotes>
+    <PackageReleaseNotes>Fixed issue with retry function</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <PackageProjectUrl>https://github.com/Meyn1/DownloadLibrary</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Meyn1/DownloadLibrary</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <Version>1.0.2.3</Version>
+    <Version>1.0.2.4</Version>
   </PropertyGroup>
 
   <ItemGroup>

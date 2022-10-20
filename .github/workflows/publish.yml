@@ -10,15 +10,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-       - name: Setup dotnet
-         uses: actions/setup-dotnet@v1
-         with:
-           dotnet-version: 6.0.10
-
       # Publish
       - name: publish on version change
         id: publish_nuget
-        uses: brandedoutcast/publish-nuget@v2
+        uses: alirezanet/publish-nuget@v3.0.0
         with:
           # Filepath of the project to be packaged, relative to root of repository
           PROJECT_FILE_PATH: DownloaderLibrary/DownloaderLibrary.csproj
@@ -30,7 +25,7 @@ jobs:
           # BUILD_PLATFORM: x64          
           
           # NuGet package id, used for version detection & defaults to project name
-          PACKAGE_NAME: Shard.DownloaderLibrary
+          #PACKAGE_NAME: Shard.DownloaderLibrary
           
           # Filepath with version info, relative to root of repository & defaults to PROJECT_FILE_PATH
           #VERSION_FILE_PATH: Directory.Build.props

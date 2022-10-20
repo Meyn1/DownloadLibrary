@@ -4,9 +4,10 @@
     {
         internal List<LoadRequest> Requests { get; init; } = new();
         internal byte Index { get; init; }
-        internal PriorityQueue<string, byte> Destinations { get; init; } = new();
+        internal string[] Destinations { get; init; } = Array.Empty<string>();
         internal float[]? Progress { get; init; }
         internal bool IsRangeSet { get; set; }
         internal Action<object>? OnCompleated { get; init; }
+        internal IProgress<float>? MainProgress { get; init; }
     }
 }
