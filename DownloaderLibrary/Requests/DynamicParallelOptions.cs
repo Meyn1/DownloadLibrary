@@ -7,7 +7,10 @@
     {
         private int _maxDegreeOfParallelism = Environment.ProcessorCount;
 
+
         public event EventHandler<int>? DegreeOfParallelismChangedDelta;
+
+        public CancellationToken EasyEndToken { get; set; }
 
         public DynamicParallelOptions() => base.MaxDegreeOfParallelism = int.MaxValue;
 

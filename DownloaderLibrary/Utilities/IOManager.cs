@@ -7,7 +7,7 @@ using System.Text;
 
 namespace DownloaderLibrary.Utilities
 {
-    internal class IOManager
+    internal static class IOManager
     {
         /// <summary>
         /// Converts Bytes to Megabytes

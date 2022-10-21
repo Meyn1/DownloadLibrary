@@ -52,13 +52,9 @@ namespace DownloaderLibrary.Requests
         {
             get
             {
-                if (_speedQuene.IsEmpty)
+                if (_speedQuene.Count < 10)
                     return _speed;
-                _speed = 0;
-                int counter = _speedQuene.Count;
-                foreach (int speed in _speedQuene)
-                    _speed += speed;
-                _speed /= counter;
+                _speed = (long)_speedQuene.Average();
                 _speedQuene.Clear();
                 return _speed;
             }
@@ -79,7 +75,7 @@ namespace DownloaderLibrary.Requests
         /// </summary>
         /// <param name="request">Requests that sould be added</param>
         public void AddRequest(Request request)
-        => _requestsToPerform.Writer.WriteAsync(new((int)request.Options.PriorityLevel, request));
+        => _ = _requestsToPerform.Writer.WriteAsync(new((int)request.Options.PriorityLevel, request)).AsTask();
 
 
         /// <summary>
@@ -87,7 +83,7 @@ namespace DownloaderLibrary.Requests
         /// </summary>
         /// <param name="requests">Requests that sould be added</param>
         public void AddRequest(params Request[] requests)
-        => Array.ForEach(requests, request => _requestsToPerform.Writer.WriteAsync(new((int)request.Options.PriorityLevel, request)));
+        => Array.ForEach(requests, request => _ = _requestsToPerform.Writer.WriteAsync(new((int)request.Options.PriorityLevel, request)).AsTask());
 
 
         /// <summary>
@@ -120,7 +116,8 @@ namespace DownloaderLibrary.Requests
             {
                 _cancellationTokenSource.Dispose();
                 _cancellationTokenSource = new CancellationTokenSource();
-                if (CountRequests != 0)
+                _parallelOptions.CancellationToken = CT;
+                if (CountRequests > 0)
                     RunRequests();
             }
         }
@@ -168,73 +165,24 @@ namespace DownloaderLibrary.Requests
                 return;
             IsRunning = true;
 
-            Task.Run(() =>
+            Task.Run(async () =>
             {
-                bool breakFlag = false;
-                DynamicParallelForEachAsync(_requestsToPerform.Reader.ReadAllAsync().TakeWhile(_ => !Volatile.Read(ref breakFlag)), _parallelOptions, async (pair, ct) =>
+                await _requestsToPerform.DynamicParallelForEachAsync(async (pair, ct) =>
                 {
                     Request request = pair.item;
+
                     await request.StartRequestAsync();
+
                     if (request.State == RequestState.Compleated || request.State == RequestState.Failed || request.State == RequestState.Cancelled)
                         request.Dispose();
                     else if (request.State == RequestState.Available)
-                        _ = _requestsToPerform.Writer.WriteAsync(pair);
+                        await _requestsToPerform.Writer.WriteAsync(pair);
 
-                    if (CT.IsCancellationRequested)
-                        Volatile.Write(ref breakFlag, true);
-                });
-
+                }, _parallelOptions);
                 IsRunning = false;
                 if (_requestsToPerform.Reader.Count != 0)
                     RunRequests();
             });
-
         }
-
-
-        /// <summary>
-        /// Executes a parallel for-each operation on an async-enumerable sequence,
-        /// enforcing a dynamic maximum degree of parallelism.
-        /// </summary>
-        private static Task DynamicParallelForEachAsync<TSource>(IAsyncEnumerable<TSource> source, DynamicParallelOptions options, Func<TSource, CancellationToken, ValueTask> body)
-        {
-            _ = source ?? throw new ArgumentNullException(nameof(source));
-            _ = options ?? throw new ArgumentNullException(nameof(options));
-            _ = body ?? throw new ArgumentNullException(nameof(body));
-
-            SemaphoreSlim throttler = new(options.MaxDegreeOfParallelism);
-            options.DegreeOfParallelismChangedDelta += Options_ChangedDelta;
-            void Options_ChangedDelta(object? sender, int delta)
-            {
-                if (delta > 0)
-                    throttler.Release(delta);
-                else
-                    for (int i = delta; i < 0; i++) throttler.WaitAsync();
-            }
-
-            async IAsyncEnumerable<TSource> GetThrottledSource()
-            {
-                await foreach (TSource? item in source.ConfigureAwait(false))
-                {
-                    await throttler.WaitAsync().ConfigureAwait(false);
-                    yield return item;
-                }
-            }
-
-            return Parallel.ForEachAsync(GetThrottledSource(), options, async (item, ct) =>
-            {
-                try { await body(item, ct).ConfigureAwait(false); }
-                finally { throttler.Release(); }
-            }).ContinueWith(t =>
-            {
-                options.DegreeOfParallelismChangedDelta -= Options_ChangedDelta;
-                return t;
-            }, default, TaskContinuationOptions.DenyChildAttach, TaskScheduler.Default)
-                .Unwrap();
-        }
-
     }
-
-
-
 }

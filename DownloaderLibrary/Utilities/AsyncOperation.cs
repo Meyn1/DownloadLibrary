@@ -9,7 +9,7 @@ namespace DownloaderLibrary.Utilities
     // The .NET Foundation licenses this file to you under the MIT license
 
     /// <summary>The representation of an asynchronous operation that has a result value.</summary>
-    internal partial class AsyncOperation<TResult> : IValueTaskSource, IValueTaskSource<TResult>
+    internal class AsyncOperation<TResult> : IValueTaskSource, IValueTaskSource<TResult>
     {
         /// <summary>Sentinel object used in a field to indicate the operation is available for use.</summary>
         protected static readonly Action<object?> s_availableSentinel = AvailableSentinel; // named method to help with debugging

@@ -41,7 +41,7 @@ Repository: https://github.com/Meyn1/DownloadLibrary
 
 Installation over [NuGet](https://www.nuget.org/packages/Shard.DonwloadLibrary) Package manager in Visual Studio or online.
 URL: https://www.nuget.org/packages/Shard.DonwloadLibrary.
-Package Manager Console: PM> NuGet\Install-Package Shard.DonwloadLibrary -Version 1.0.3
+Package Manager Console: PM> NuGet\Install-Package Shard.DonwloadLibrary -Version 1.0.3.1
 
 ## How to use
 

@@ -30,7 +30,7 @@ Contains at the moment:
     <PackageProjectUrl>https://github.com/Meyn1/DownloadLibrary</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Meyn1/DownloadLibrary</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <Version>1.0.3</Version>
+    <Version>1.0.3.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
