@@ -23,6 +23,7 @@ namespace DownloaderLibrary.Requests
         private Range Range => Options.Range;
 
         private Chunk? _chunk;
+        private CancellationTokenSource? _timeoutCTS = null;
 
         private string Destination { get; set; } = string.Empty;
         private string TmpDestination { get; set; } = string.Empty;
@@ -64,7 +65,8 @@ namespace DownloaderLibrary.Requests
                 Options.TemporaryPath = Options.DestinationPath;
 
             LoadFileInfo();
-            Start();
+            if (Options.AutoStart)
+                Start(true);
             InitializeChunks();
         }
 
@@ -161,11 +163,11 @@ namespace DownloaderLibrary.Requests
                 Requests = new(Options.Chunks) { this },
                 Index = 0,
                 Destinations = new string[Options.Chunks],
-                OnCompleated = Options.CompleatedAction,
+                OnCompleated = Options.RequestCompleated,
                 Progress = progress != null ? new float[Options.Chunks] : null,
                 MainProgress = progress
             };
-            Options.CompleatedAction = null;
+            Options.RequestCompleated = null;
 
             if (_chunk.Progress != null)
                 Options.Progress = new Progress<float>(f =>
@@ -206,7 +208,8 @@ namespace DownloaderLibrary.Requests
                     }
                 });
             TempExt = $"_{index}.chunk";
-            Start();
+            if (Options.AutoStart)
+                Start(true);
         }
 
         /// <summary>
@@ -219,13 +222,14 @@ namespace DownloaderLibrary.Requests
             {
                 (bool result, HttpResponseMessage message) result = await Load();
                 result.message.Dispose();
+                _timeoutCTS?.Dispose();
                 if (State == RequestState.Running)
                     if (result.result)
                     {
                         Options.Progress?.Report(1);
-                        Options.CompleatedAction?.Invoke(Destination);
+                        Options.RequestCompleated?.Invoke(Destination);
                     }
-                    else Options.FaultedAction?.Invoke(result.message);
+                    else Options.RequestFailed?.Invoke(result.message);
                 return result.result;
             }
             catch (TaskCanceledException) { }
@@ -235,6 +239,7 @@ namespace DownloaderLibrary.Requests
             catch (HttpRequestException) { }
             catch (IOException) { }
             catch (Exception) { }
+            _timeoutCTS?.Dispose();
             return false;
         }
 
@@ -391,10 +396,15 @@ namespace DownloaderLibrary.Requests
                 msg.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36");
             foreach (KeyValuePair<string, string> keyValuePair in Options.Headers)
                 msg.Headers.Add(keyValuePair.Key, keyValuePair.Value);
+            if (Options.Timeout.HasValue)
+            {
+                _timeoutCTS = CancellationTokenSource.CreateLinkedTokenSource(Token);
+                _timeoutCTS.CancelAfter(Options.Timeout.Value);
+            }
 
             if (State != RequestState.Running)
                 return new();
-            return await RequestHandler.HttpClient.SendAsync(msg, HttpCompletionOption.ResponseHeadersRead, Token);
+            return await RequestHandler.HttpClient.SendAsync(msg, HttpCompletionOption.ResponseHeadersRead, _timeoutCTS?.Token ?? Token);
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-﻿namespace DownloaderLibrary.Requests
+﻿namespace DownloaderLibrary.Utilities
 {
     /// <summary>
     /// Stores options that configure the DynamicParallelForEachAsync method.

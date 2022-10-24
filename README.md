@@ -13,18 +13,20 @@ All `Requests` will be handled by an `PriorityChannel` in a Parallel asyncron st
 At the moment:
 - **StatusRequest:** Calls a Head request and returns a response message with the header information.
 - **OwnRequest:** Wrapper around your own requests. Easy to self-expand function of handling the downloads.
-- **RequestContainer** A container class to merge requests together and to start, pause and await them.
+- **RequestContainer:** A container class to merge requests together and to start, pause and await them.
 - **Request:** Main abstract class that can be used to expand functionality on class-based level.
     - All subclasses have a retry function
     - A completed and failed event
     - A priority function
     - A second thread for bigger files to hold the app responsive
+    - Delegates to notify when `Request` failed, completed, or canceled
     - Implementation for custom `CancellationToken` and a main `CancellationTokenSource` on `Downloader` to cancel all downloads
 - **LoadRequest:** To download the response content into files.
   - This is an HTTP file downloader with these functions:
   - *Pause* and *Start* a download
   - *Resume* a download
   - Get the *file name* and *extension* from the server 
+  - Timeout function
   - Monitor the progress of the download with `IProgress<float>`
   - Can set path and filename 
   - Download a specified range of a file
@@ -41,7 +43,7 @@ Repository: https://github.com/Meyn1/DownloadLibrary
 
 Installation over [NuGet](https://www.nuget.org/packages/Shard.DonwloadLibrary) Package manager in Visual Studio or online.
 URL: https://www.nuget.org/packages/Shard.DonwloadLibrary.
-Package Manager Console: PM> NuGet\Install-Package Shard.DonwloadLibrary -Version 1.0.3.1
+Package Manager Console: PM> NuGet\Install-Package Shard.DonwloadLibrary
 
 ## How to use
 

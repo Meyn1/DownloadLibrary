@@ -56,6 +56,11 @@ namespace DownloaderLibrary.Requests
         }
 
         /// <summary>
+        /// Timeout of the <see cref="Request"/>.
+        /// </summary>
+        public TimeSpan? Timeout { get; set; } = null;
+
+        /// <summary>
         /// Chunks the <see cref="LoadRequest"/> and partial downloads the file
         /// <para>(Only if server supports it)</para>
         /// </summary>

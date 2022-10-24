@@ -1,5 +1,4 @@
-﻿using DownloaderLibrary.Requests;
-using System.Threading.Channels;
+﻿using System.Threading.Channels;
 
 namespace DownloaderLibrary.Utilities
 {

@@ -19,18 +19,36 @@
         Low
     }
     /// <summary>
+    /// Delegate has no return type or parameter;
+    /// </summary>
+    public delegate void NotifyVoid();
+
+    /// <summary>
+    /// Delegate has no return type but a parameter;
+    /// </summary>
+    /// <param name="httpResponseMessage"></param>
+    public delegate void NotifyMessage(HttpResponseMessage httpResponseMessage);
+
+    /// <summary>
+    /// Delegate has no return type but a parameter;
+    /// </summary>
+    /// <param name="obj"></param>
+    public delegate void NotifyObject(object? obj);
+
+    /// <summary>
     /// A Class to hold the options on a <see cref="Request"/> class and to modify it.
     /// </summary>
     public class RequestOptions
     {
-        ///// <summary>
-        ///// If the <see cref="Request"/> has priority over other not prioritized <see cref="Request">Requests</see>.
-        ///// </summary>
-        //public bool HasPriority { get; init; } = false;
+        /// <summary>
+        /// If the Request sould be automaticly started if when it is inizialised.
+        /// </summary>
+        public bool AutoStart { get; set; } = true;
         /// <summary>
         /// If the <see cref="Request"/> has priority over other not prioritized <see cref="Request">Requests</see>.
         /// </summary>
         public PriorityLevel PriorityLevel { get; set; } = PriorityLevel.Normal;
+
         /// <summary>
         /// If the <see cref="Request"/> is an big file and sold download in a second <see cref="Thread"/>.
         /// Can't be used if <see cref="RequestHandler"/> is manually set.
@@ -49,7 +67,7 @@
         /// <summary>
         /// Delays the start of the <see cref="Request"/> on every Start call for the specified number of milliseconds.
         /// </summary>
-        public int DeployDelay = 0;
+        public TimeSpan? DeployDelay { get; set; } = null;
         /// <summary>
         /// If the <see cref="Request"/> is an big file and sold download in a second  <see cref="Thread"/>.
         /// </summary>
@@ -58,22 +76,28 @@
         /// How often the <see cref="Request"/> sould be retried if it fails.
         /// </summary>
         public byte TryCounter { get; set; } = 3;
+
+        /// <summary>
+        /// How long sould be the new Attemp be delayed if the <see cref="Request"/> fails.
+        /// </summary>
+        public TimeSpan? DelayBetweenAttemps { get; set; } = null;
+
         /// <summary>
         /// <see cref="System.Threading.CancellationToken"/> that the user sets to cancel the <see cref="Request"/>.
         /// </summary>
         public CancellationToken? CancellationToken { get; set; } = null;
         /// <summary>
-        /// Action that will be called when the <see cref="Request"/> finished.
+        /// Event that will be risen when the <see cref="Request"/> finished.
         /// </summary>
-        public Action<object?>? CompleatedAction { get; set; }
+        public NotifyObject? RequestCompleated;
         /// <summary>
-        /// Action that will be called when the <see cref="Request"/> failed.
+        /// Event that will be risen when the <see cref="Request"/> failed.
         /// </summary>
-        public Action<HttpResponseMessage>? FaultedAction { get; set; }
+        public NotifyMessage? RequestFailed;
         /// <summary>
-        /// Action that will be called when the <see cref="Request"/> is cancelled.
+        /// Event that will be risen when the <see cref="Request"/> is cancelled.
         /// </summary>
-        public Action? CancelledAction { get; set; }
+        public NotifyVoid? RequestCancelled;
 
         /// <summary>
         /// Main Constructor for a <see cref="RequestOptions"/> object.
@@ -93,9 +117,9 @@
             RequestHandler = options.RequestHandler;
             TryCounter = options.TryCounter;
             CancellationToken = options.CancellationToken;
-            CompleatedAction = (Action<object?>?)options.CompleatedAction?.Clone();
-            FaultedAction = (Action<HttpResponseMessage>?)options.FaultedAction?.Clone();
-            CancelledAction = (Action?)options.CancelledAction?.Clone();
+            RequestCompleated += options.RequestCompleated;
+            RequestFailed += options.RequestFailed;
+            RequestCancelled += options.RequestCancelled;
         }
     }
 }

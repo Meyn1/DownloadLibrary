@@ -24,6 +24,10 @@
         /// <summary>
         /// <see cref="Request"/> is cancelled.
         /// </summary>
+        Waiting,
+        /// <summary>
+        /// <see cref="Request"/> is cancelled.
+        /// </summary>
         Cancelled,
         /// <summary>
         /// <see cref="Request"/> failed.
@@ -48,6 +52,10 @@
         /// </summary>
         private CancellationTokenSource _cts;
         /// <summary>
+        /// The <see cref="CancellationTokenRegistration"/> for this object.
+        /// </summary>
+        private CancellationTokenRegistration _ctr;
+        /// <summary>
         /// The <see cref="RequestState"/> of this <see cref="Request"/>.
         /// </summary>
         private RequestState _state = RequestState.Onhold;
@@ -55,7 +63,6 @@
         /// <see cref="System.Threading.Tasks.Task"/> that indicates of this <see cref="Request"/> finished.
         /// </summary>
         private readonly TaskCompletionSource _isFinished = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
 
         /// <summary>
         /// The <see cref="RequestOptions"/> of this object.
@@ -66,23 +73,26 @@
         /// <see cref="CancellationToken"/> that indicates if this <see cref="Request"/> was cancelled.
         /// </summary>
         protected CancellationToken Token => _cts.Token;
+
         /// <summary>
         /// <see cref="String"/> that holds the URL of the <see cref="Request"/>.
         /// </summary>
         protected readonly string _url;
+
         /// <summary>
         /// <see cref="System.Threading.Tasks.Task"/> that indicates of this <see cref="Request"/> finished.
         /// </summary>
         public Task Task => _isFinished.Task;
+
         /// <summary>
         /// Delays the start of the <see cref="Request"/> on every Start call for the specified number of milliseconds.
         /// </summary>
-        public int DeployDelay { get => Options.DeployDelay; set => Options.DeployDelay = value; }
+        public TimeSpan? DeployDelay { get => Options.DeployDelay; set => Options.DeployDelay = value; }
 
         /// <summary>
         /// The <see cref="RequestState"/> of this <see cref="Request"/>.
         /// </summary>
-        public RequestState State { get => _state; protected set => _state = _state == RequestState.Compleated || _state == RequestState.Failed ? _state : value; }
+        public RequestState State { get => _state; protected set => _state = _state == RequestState.Compleated || _state == RequestState.Failed || _state == RequestState.Cancelled ? _state : value; }
 
         /// <summary>
         /// Consructor of the <see cref="Request"/> class 
@@ -97,6 +107,7 @@
                 _cts = CancellationTokenSource.CreateLinkedTokenSource(Options.RequestHandler.CT, Options.CancellationToken.Value);
             else
                 _cts = CancellationTokenSource.CreateLinkedTokenSource(Options.RequestHandler.CT);
+            _ctr = Token.Register(() => Options.RequestCancelled?.Invoke());
         }
 
         /// <summary>
@@ -141,9 +152,15 @@
         {
             if (_disposed)
                 return;
-            if (dispose)
-                _cts.Dispose();
+
             _disposed = true;
+            if (!dispose)
+                return;
+            Options.RequestCancelled = null;
+            Options.RequestCompleated = null;
+            Options.RequestFailed = null;
+            _cts.Dispose();
+            _ctr.Unregister();
         }
 
         /// <summary>
@@ -161,10 +178,12 @@
                     if (Options.RequestHandler.CT.IsCancellationRequested)
                         return;
                     _cts.Dispose();
+                    _ctr.Unregister();
                     if (Options.CancellationToken.HasValue)
                         _cts = CancellationTokenSource.CreateLinkedTokenSource(Options.RequestHandler.CT, Options.CancellationToken.Value);
                     else
                         _cts = CancellationTokenSource.CreateLinkedTokenSource(Options.RequestHandler.CT);
+                    _ctr = Token.Register(() => Options.RequestCancelled?.Invoke());
                 }
                 State = RequestState.Running;
             }
@@ -189,7 +208,15 @@
                     else
                         State = RequestState.Available;
                 else if (_tryCounter++ < Options.TryCounter)
-                    State = RequestState.Available;
+                {
+                    if (Options.DelayBetweenAttemps.HasValue)
+                    {
+                        State = RequestState.Waiting;
+                        WaitOnDeploy(Options.DelayBetweenAttemps.Value);
+                    }
+                    else
+                        State = RequestState.Available;
+                }
                 else
                     State = RequestState.Failed;
 
@@ -210,16 +237,29 @@
         {
             if (State != RequestState.Onhold)
                 return;
-            State = RequestState.Available;
-            if (DeployDelay > 0)
-                Task.Run(() =>
-                {
-                    Task.Delay(DeployDelay);
-                    if (State == RequestState.Available)
-                        Options.RequestHandler.RunRequests(this);
-                });
+            State = DeployDelay.HasValue ? RequestState.Waiting : RequestState.Available;
+            if (DeployDelay.HasValue)
+                WaitOnDeploy(DeployDelay.Value);
             else
                 Options.RequestHandler.RunRequests(this);
+        }
+
+        /// <summary>
+        /// Waits that the timespan ends to deploy the <see cref="Request"/>
+        /// </summary>
+        /// <param name="timeSpan">Time span to the deploy</param>
+        private void WaitOnDeploy(TimeSpan timeSpan)
+        {
+            if (State != RequestState.Waiting)
+                return;
+            Task.Run(() =>
+            {
+                Task.Delay(timeSpan);
+                if (State != RequestState.Waiting)
+                    return;
+                State = RequestState.Available;
+                Options.RequestHandler.RunRequests(this);
+            });
         }
         /// <summary>
         /// Set the <see cref="Request"/> on hold.

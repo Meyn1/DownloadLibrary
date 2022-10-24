@@ -15,7 +15,8 @@
         public OwnRequest(Func<CancellationToken, Task<bool>> own, RequestOptions? requestOptions = null) : base(string.Empty, requestOptions)
         {
             _own = own;
-            Start();
+            if (Options.AutoStart)
+                Start();
         }
 
         /// <summary>
@@ -26,10 +27,12 @@
         {
             bool result = await _own.Invoke(Token);
             if (result)
-                Options.CompleatedAction?.Invoke(null);
+                Options.RequestCompleated?.Invoke(null);
             else
-                Options.FaultedAction?.Invoke(new HttpResponseMessage());
+                Options.RequestFailed?.Invoke(new HttpResponseMessage());
             return result;
         }
+
+
     }
 }
