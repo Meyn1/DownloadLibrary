@@ -1,4 +1,4 @@
-﻿namespace DownloaderLibrary.Utilities
+﻿namespace DownloaderLibrary.Base
 {
     // Licensed to the .NET Foundation under one or more agreements.
     // The .NET Foundation licenses this file to you under the MIT license
@@ -19,53 +19,40 @@
         public void EnqueueTail(T item)
         {
             if (_size == _array.Length)
-            {
                 Grow();
-            }
 
             _array[_tail] = item;
             if (++_tail == _array.Length)
-            {
                 _tail = 0;
-            }
             _size++;
         }
 
         public T DequeueHead()
         {
-
             T item = _array[_head];
             _array[_head] = default!;
 
             if (++_head == _array.Length)
-            {
                 _head = 0;
-            }
             _size--;
 
             return item;
         }
-        public T PeekHead() =>
-            _array[_head];
+        public T PeekHead() => _array[_head];
 
 
         public T PeekTail()
         {
             int index = _tail - 1;
             if (index == -1)
-            {
                 index = _array.Length - 1;
-            }
             return _array[index];
         }
 
         public T DequeueTail()
         {
-
             if (--_tail == -1)
-            {
                 _tail = _array.Length - 1;
-            }
 
             T item = _array[_tail];
             _array[_tail] = default!;
@@ -87,21 +74,15 @@
 
         private void Grow()
         {
-
             const int MinimumGrow = 4;
-
             int capacity = (int)(_array.Length * 2L);
             if (capacity < _array.Length + MinimumGrow)
-            {
                 capacity = _array.Length + MinimumGrow;
-            }
 
             T[] newArray = new T[capacity];
 
             if (_head == 0)
-            {
                 Array.Copy(_array, newArray, _size);
-            }
             else
             {
                 Array.Copy(_array, _head, newArray, 0, _array.Length - _head);

@@ -114,9 +114,7 @@ namespace DownloaderLibrary.Utilities
         public ValueTaskSourceStatus GetStatus(short token)
         {
             if (_currentId != token)
-            {
                 ThrowIncorrectCurrentIdException();
-            }
 
             return
                 !IsCompleted ? ValueTaskSourceStatus.Pending :
@@ -156,22 +154,16 @@ namespace DownloaderLibrary.Utilities
         void IValueTaskSource.GetResult(short token)
         {
             if (_currentId != token)
-            {
                 ThrowIncorrectCurrentIdException();
-            }
 
             if (!IsCompleted)
-            {
                 ThrowIncompleteOperationException();
-            }
 
             ExceptionDispatchInfo? error = _error;
             _currentId++;
 
             if (_pooled)
-            {
-                Volatile.Write(ref _continuation, s_availableSentinel); // only after fetching all needed data
-            }
+                Volatile.Write(ref _continuation, s_availableSentinel);
 
             error?.Throw();
         }
@@ -201,25 +193,14 @@ namespace DownloaderLibrary.Utilities
         public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
         {
             if (_currentId != token)
-            {
                 ThrowIncorrectCurrentIdException();
-            }
 
-            // We need to store the state before the CompareExchange, so that if it completes immediately
-            // after the CompareExchange, it'll find the state already stored.  If someone misuses this
-            // and schedules multiple continuations erroneously, we could end up using the wrong state.
-            // Make a best-effort attempt to catch such misuse.
             if (_continuationState != null)
-            {
                 ThrowMultipleContinuations();
-            }
             _continuationState = state;
 
-            // Capture the execution context if necessary.
             if ((flags & ValueTaskSourceOnCompletedFlags.FlowExecutionContext) != 0)
-            {
                 _executionContext = ExecutionContext.Capture();
-            }
 
             SynchronizationContext? sc = null;
             TaskScheduler? ts = null;
@@ -227,58 +208,33 @@ namespace DownloaderLibrary.Utilities
             {
                 sc = SynchronizationContext.Current;
                 if (sc != null && sc.GetType() != typeof(SynchronizationContext))
-                {
                     _schedulingContext = sc;
-                }
                 else
                 {
                     sc = null;
                     ts = TaskScheduler.Current;
                     if (ts != TaskScheduler.Default)
-                    {
                         _schedulingContext = ts;
-                    }
                 }
             }
 
-            // Try to set the provided continuation into _continuation.  If this succeeds, that means the operation
-            // has not yet completed, and the completer will be responsible for invoking the callback.  If this fails,
-            // that means the operation has already completed, and we must invoke the callback, but because we're still
-            // inside the awaiter's OnCompleted method and we want to avoid possible stack dives, we must invoke
-            // the continuation asynchronously rather than synchronously.
             Action<object?>? prevContinuation = Interlocked.CompareExchange(ref _continuation, continuation, null);
             if (prevContinuation != null)
             {
-                // If the set failed because there's already a delegate in _continuation, but that delegate is
-                // something other than s_completedSentinel, something went wrong, which should only happen if
-                // the instance was erroneously used, likely to hook up multiple continuations.
                 if (!ReferenceEquals(prevContinuation, s_completedSentinel))
-                {
                     ThrowMultipleContinuations();
-                }
 
-                // Queue the continuation.  We always queue here, even if !RunContinuationsAsynchronously, in order
-                // to avoid stack diving; this path happens in the rare race when we're setting up to await and the
-                // object is completed after the awaiter.IsCompleted but before the awaiter.OnCompleted.
+
                 if (_schedulingContext == null)
-                {
                     if (_executionContext == null)
-                    {
                         UnsafeQueueUserWorkItem(continuation, state);
-                    }
-                    else
-                    {
-                        QueueUserWorkItem(continuation, state);
-                    }
-                }
+                    else QueueUserWorkItem(continuation, state);
                 else if (sc != null)
-                {
                     sc.Post(static s =>
                     {
                         KeyValuePair<Action<object?>, object?> t = (KeyValuePair<Action<object?>, object?>)s!;
                         t.Key(t.Value);
                     }, new KeyValuePair<Action<object?>, object?>(continuation, state));
-                }
                 else
                     Task.Factory.StartNew(continuation, state, CancellationToken.None, TaskCreationOptions.DenyChildAttach, ts!);
 
@@ -373,8 +329,6 @@ namespace DownloaderLibrary.Utilities
             {
                 if (_schedulingContext == null)
                 {
-                    // There's no captured scheduling context.  If we're forced to run continuations asynchronously, queue it.
-                    // Otherwise fall through to invoke it synchronously.
                     if (_runContinuationsAsynchronously)
                     {
                         UnsafeQueueSetCompletionAndInvokeContinuation();
@@ -383,9 +337,6 @@ namespace DownloaderLibrary.Utilities
                 }
                 else if (_schedulingContext is SynchronizationContext sc)
                 {
-                    // There's a captured synchronization context.  If we're forced to run continuations asynchronously,
-                    // or if there's a current synchronization context that's not the one we're targeting, queue it.
-                    // Otherwise fall through to invoke it synchronously.
                     if (_runContinuationsAsynchronously || sc != SynchronizationContext.Current)
                     {
                         sc.Post(static s => ((AsyncOperation<TResult>)s!).SetCompletionAndInvokeContinuation(), this);
@@ -394,9 +345,6 @@ namespace DownloaderLibrary.Utilities
                 }
                 else
                 {
-                    // There's a captured TaskScheduler.  If we're forced to run continuations asynchronously,
-                    // or if there's a current scheduler that's not the one we're targeting, queue it.
-                    // Otherwise fall through to invoke it synchronously.
                     TaskScheduler ts = (TaskScheduler)_schedulingContext;
                     if (_runContinuationsAsynchronously || ts != TaskScheduler.Current)
                     {
@@ -420,7 +368,6 @@ namespace DownloaderLibrary.Utilities
                 c(_continuationState);
             }
             else
-            {
                 ExecutionContext.Run(_executionContext, static s =>
                 {
                     AsyncOperation<TResult> thisRef = (AsyncOperation<TResult>)s!;
@@ -428,7 +375,6 @@ namespace DownloaderLibrary.Utilities
                     thisRef._continuation = s_completedSentinel;
                     c(thisRef._continuationState);
                 }, this);
-            }
         }
     }
 }

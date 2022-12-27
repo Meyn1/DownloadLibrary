@@ -1,18 +1,17 @@
-﻿namespace DownloaderLibrary.Utilities
+﻿namespace DownloaderLibrary.Base
 {
     /// <summary>
-    /// Stores options that configure the DynamicParallelForEachAsync method.
+    /// Stores options that configure the degree of max parallism in for the channel
     /// </summary>
-    internal class DynamicParallelOptions : ParallelOptions
+    internal class ParallelChannelOptions : ParallelOptions
     {
         private int _maxDegreeOfParallelism = Environment.ProcessorCount;
 
-
         public event EventHandler<int>? DegreeOfParallelismChangedDelta;
 
-        public CancellationToken EasyEndToken { get; set; }
+        public PauseToken EasyEndToken { get; set; }
 
-        public DynamicParallelOptions() => base.MaxDegreeOfParallelism = int.MaxValue;
+        public ParallelChannelOptions() => base.MaxDegreeOfParallelism = int.MaxValue;
 
         public new int MaxDegreeOfParallelism
         {

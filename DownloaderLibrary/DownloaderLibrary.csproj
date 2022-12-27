@@ -13,7 +13,7 @@ All Requests will be handled by an PriorityQueue in a Parallel state to have a s
 Contains at the moment:
    • StatusRequest: Calls a Head request and returns a response message with the headers.
    • OwnRequest: Wrapper around your own requests. Easy to self-expand function.
-   • Request: Main class that can be used to expand functionality on class-based level.
+   • SiteRequest: Scans a website for all references.
    • LoadRequest: To download the response into files.
      o This is a HTTP file downloader with pause function and resuming function of partially downloaded files and implements IProgress.</Description>
     <Copyright>Shard © 2022 | Free to use</Copyright>
@@ -23,21 +23,23 @@ Contains at the moment:
     <PackageTags>Request, FreeToUse, HttpClient, producer-consumer, file-downloader, downloader, chunk, http,  .Net, WPF, Console, Document, PriorityQueue, downloadmanagement, Json, CSV, download-filestream, IProgress,</PackageTags>
     <PackageIcon>logo.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Updated retrun Actions to delegates
-Implements now RequestCancelled delegate</PackageReleaseNotes>
+    <PackageReleaseNotes>Updated Class structur
+Update Readme
+Implements SiteRequest</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <PackageProjectUrl>https://github.com/Meyn1/DownloadLibrary</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Meyn1/DownloadLibrary</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <Version>1.0.3.2</Version>
+    <Version>1.0.4</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="..\logo.png">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="..\README.md">
       <Pack>True</Pack>

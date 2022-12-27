@@ -1,8 +1,9 @@
-﻿using Microsoft.Win32;
-using Microsoft.Win32.SafeHandles;
+﻿using DownloaderLibrary.Web;
+using DownloaderLibrary.Web.Request;
+using Microsoft.Win32;
+using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Security;
-using System.Security.AccessControl;
 using System.Text;
 
 namespace DownloaderLibrary.Utilities
@@ -29,6 +30,7 @@ namespace DownloaderLibrary.Utilities
                 fileBuilder.Replace(c.ToString(), string.Empty);
             return fileBuilder.ToString();
         }
+
         /// <summary>
         /// Gets the default extension aof an mimeType
         /// </summary>
@@ -112,6 +114,7 @@ namespace DownloaderLibrary.Utilities
 
             return status;
         }
+
         /// <summary>
         /// Gets the Home or Desktop path
         /// </summary>
@@ -124,6 +127,7 @@ namespace DownloaderLibrary.Utilities
                 return Environment.GetEnvironmentVariable("HOME");
             return Environment.ExpandEnvironmentVariables("%HOMEDRIVE%%HOMEPATH%");
         }
+
         /// <summary>
         /// Gets the download folder path
         /// </summary>
@@ -153,42 +157,106 @@ namespace DownloaderLibrary.Utilities
             else return null;
         }
 
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern SafeFileHandle CreateFile(string lpFileName,
-    FileSystemRights dwDesiredAccess, FileShare dwShareMode, IntPtr
-    securityAttrs, FileMode dwCreationDisposition, FileOptions
-    dwFlagsAndAttributes, IntPtr hTemplateFile);
-
-        private const int ERROR_SHARING_VIOLATION = 32;
+        /// <summary>
+        /// Moves a file to another destination. If it existst it will be overwritten
+        /// </summary>
+        /// <param name="path">Source file path</param>
+        /// <param name="destination">Destination file path</param>
+        public static void Move(string path, string destination) => File.Move(path, destination, true);
 
         /// <summary>
-        /// A Method that is used to indicate if a file is used and locked
-        /// If it does not exists it creates one.
-        /// Only available to Windows
+        /// Creates a file or clears an existing one
         /// </summary>
-        /// <param name="fileName">Path to file</param>
-        /// <returns>A <see cref="bool"/> that indicates if the file is in use</returns>
-        /// <exception cref="NotSupportedException"></exception>
-        public static bool IsFileInUse(string fileName)
+        /// <param name="path">Path to the file that should be created</param>
+        public static void Create(string path) => File.Create(path).Close();
+
+        /// <summary>
+        /// Gets the guessed FileName from a given url and response
+        /// </summary>
+        /// <param name="headers">ContentHeaders of the request</param>
+        /// <param name="preSetFilename">Name that was pre set</param>
+        /// <param name="uri">Given Uri/Url</param>
+        /// <returns></returns>
+        public static string GetFileName(HttpContentHeaders headers, string preSetFilename, Uri uri)
         {
-            bool inUse = false;
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            string fileName = preSetFilename;
+            if (fileName == string.Empty)
             {
-                SafeFileHandle fileHandle =
-            CreateFile(fileName, FileSystemRights.Modify,
-                 FileShare.Write, IntPtr.Zero,
-                 FileMode.OpenOrCreate, FileOptions.None, IntPtr.Zero);
-
-                if (fileHandle.IsInvalid)
-                    if (Marshal.GetLastWin32Error() == ERROR_SHARING_VIOLATION)
-                        inUse = true;
-
-                fileHandle.Close();
+                fileName = headers.ContentDisposition?.FileNameStar ?? string.Empty;
+                if (fileName == string.Empty)
+                    fileName = RemoveInvalidFileNameChars(uri.Segments.Last() ?? string.Empty);
+                if (fileName == string.Empty)
+                    fileName = RemoveInvalidFileNameChars(Path.GetFileName(uri.AbsoluteUri) ?? string.Empty);
+                if (fileName == string.Empty)
+                    fileName = "requested_download";
             }
-            else throw new NotSupportedException("IsFileInUse Method");
 
-            return inUse;
+            if (!fileName.Contains('.'))
+            {
+                string ext = string.Empty;
+                if (headers.ContentType?.MediaType != null)
+                    ext = GetDefaultExtension(headers.ContentType.MediaType);
+                if (ext == string.Empty)
+                    ext = Path.GetExtension(uri.AbsoluteUri);
+                fileName += ext;
+            }
+            return fileName;
+        }
+
+        /// <summary>
+        /// Merges all chunked parts of a file into one big file.
+        /// </summary>
+        /// <returns>A awaitable Task</returns>
+        public static async Task MergeChunks<T>(ChunkInfo<T> chunkInfo)
+        {
+            if (chunkInfo.IsCopying)
+                return;
+            chunkInfo.IsCopying = true;
+
+            Chunk[] chunks = chunkInfo.Chunks;
+            LoadRequest[] requests = chunkInfo.Requests;
+
+            //Check if the fist part was downloaded
+            if (!chunks[0].IsFinished)
+            {
+                chunkInfo.IsCopying = false;
+                return;
+            }
+
+            //FileStream to merge the chunked files
+            FileStream? outputStream = null;
+            try
+            {
+                outputStream = new(requests[0].Destination, FileMode.Append);
+                for (int i = 0; i < chunks.Length; i++)
+                {
+                    if (!chunks[i].IsFinished)
+                        break;
+                    if (chunks[i].IsCopied)
+                        continue;
+                    string path = requests[i].TmpDestination;
+                    if (!File.Exists(path))
+                        break;
+
+                    FileStream inputStream = File.OpenRead(path);
+                    await inputStream.CopyToAsync(outputStream);
+                    await inputStream.FlushAsync();
+                    await inputStream.DisposeAsync();
+                    File.Delete(path);
+
+                    chunks[i].IsCopied = true;
+                }
+            }
+            catch (Exception) { }
+            finally
+            {
+                if (outputStream != null)
+                {
+                    await outputStream.FlushAsync();
+                    await outputStream.DisposeAsync();
+                }
+                chunkInfo.IsCopying = false;
+            }
         }
     }
 }

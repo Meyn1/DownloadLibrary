@@ -1,21 +1,28 @@
-﻿using System.Collections.Concurrent;
+﻿using DownloaderLibrary.Utilities;
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 
-namespace DownloaderLibrary.Utilities
+namespace DownloaderLibrary.Base
 {
+    /// <summary>
+    /// Record that transport the item and the prority of the item
+    /// </summary>
+    /// <param name="Priority">Priority of the item</param>
+    /// <param name="Item">Item that the channel uses</param>
+    public record PriorityItem<TElement>(int Priority, TElement Item);
     /// <summary>
     /// A implementation of channel with a priority listing
     /// </summary>
     /// <typeparam name="TElement"></typeparam>
-    public class PriorityChannel<TElement> : Channel<(int priority, TElement item)>
+    public class PriorityChannel<TElement> : Channel<PriorityItem<TElement>>
     {
         /// <summary>Task that indicates the channel has completed.</summary>
         private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         /// <summary>The items in the channel.</summary>
-        private readonly ConcurrentQueue<(int priority, TElement item)>[] _queues = null!;
+        private readonly ConcurrentQueue<PriorityItem<TElement>>[] _queues = null!;
         /// <summary>Readers blocked reading from the channel.</summary>
-        private readonly Deque<AsyncOperation<(int priority, TElement item)>> _blockedReaders = new();
+        private readonly Deque<AsyncOperation<PriorityItem<TElement>>> _blockedReaders = new();
 
         /// <summary>Readers waiting for a notification that data is available.</summary>
         private AsyncOperation<bool>? _waitingReadersTail;
@@ -26,6 +33,8 @@ namespace DownloaderLibrary.Utilities
         private readonly int _priorityCount = 0;
         private int m_count = 0;
 
+        internal ParallelChannelOptions Options { get; } = new();
+
         /// <summary>
         /// Initialize the priority channel.
         /// </summary>
@@ -33,25 +42,76 @@ namespace DownloaderLibrary.Utilities
         internal PriorityChannel(int priCount)
         {
             _priorityCount = priCount;
-            _queues = new ConcurrentQueue<(int priority, TElement item)>[_priorityCount];
+            _queues = new ConcurrentQueue<PriorityItem<TElement>>[_priorityCount];
             for (int i = 0; i < _priorityCount; i++)
-                _queues[i] = new ConcurrentQueue<(int priority, TElement item)>();
+                _queues[i] = new ConcurrentQueue<PriorityItem<TElement>>();
 
             Reader = new PriorityChannelReader(this);
             Writer = new PriorityChannelWriter(this);
 
         }
 
-        private sealed class PriorityChannelReader : ChannelReader<(int priority, TElement item)>
+        /// <summary>
+        /// Executes a parallel for-each operation on this instance of <see cref="PriorityChannel{TElement}"/>,
+        /// enforcing a dynamic maximum degree of parallelism.
+        /// </summary>
+        /// <param name="body">Excecution function of parallel reader</param>
+        /// <returns>A Task</returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        internal Task RunParallelReaderAsync(Func<PriorityItem<TElement>, CancellationToken, ValueTask> body)
+        {
+            _ = body ?? throw new ArgumentNullException(nameof(body));
+
+            SemaphoreSlim throttler = new(Options.MaxDegreeOfParallelism);
+            Options.DegreeOfParallelismChangedDelta += (object? sender, int delta) => OnParallismChanged(delta, throttler);
+
+            return Parallel.ForEachAsync(GetThrottledSource(throttler), Options, async (item, ct) =>
+            {
+                try { await body(item, ct).ConfigureAwait(false); }
+                finally { throttler.Release(); }
+            }).ContinueWith(task =>
+            {
+                Options.DegreeOfParallelismChangedDelta -= (object? sender, int delta) => OnParallismChanged(delta, throttler);
+                return task;
+            }, default, TaskContinuationOptions.DenyChildAttach, TaskScheduler.Default)
+                .Unwrap();
+        }
+
+        private static void OnParallismChanged(int delta, SemaphoreSlim throttler)
+        {
+            if (delta > 0)
+                throttler.Release(delta);
+            else
+                for (int i = delta; i < 0; i++)
+                    throttler.WaitAsync();
+        }
+
+        private async IAsyncEnumerable<PriorityItem<TElement>> GetThrottledSource(SemaphoreSlim throttler)
+        {
+            await foreach (PriorityItem<TElement> element in Reader.ReadAllAsync().WithCancellation(default).ConfigureAwait(false))
+            {
+                if (Options?.EasyEndToken.IsPaused == true)
+                {
+                    _ = Writer.WriteAsync(element).AsTask();
+                    break;
+                }
+                await throttler.WaitAsync().ConfigureAwait(false);
+                yield return element;
+            }
+        }
+
+
+
+        private sealed class PriorityChannelReader : ChannelReader<PriorityItem<TElement>>
         {
             internal readonly PriorityChannel<TElement> _parent;
-            private readonly AsyncOperation<(int priority, TElement item)> _readerSingleton;
+            private readonly AsyncOperation<PriorityItem<TElement>> _readerSingleton;
             private readonly AsyncOperation<bool> _waiterSingleton;
 
             internal PriorityChannelReader(PriorityChannel<TElement> parent)
             {
                 _parent = parent;
-                _readerSingleton = new AsyncOperation<(int priority, TElement item)>(true, pooled: true);
+                _readerSingleton = new AsyncOperation<PriorityItem<TElement>>(true, pooled: true);
                 _waiterSingleton = new AsyncOperation<bool>(true, pooled: true);
             }
 
@@ -63,36 +123,36 @@ namespace DownloaderLibrary.Utilities
 
             public override int Count => _parent.m_count;
 
-            public override ValueTask<(int priority, TElement item)> ReadAsync(CancellationToken cancellationToken)
+            public override ValueTask<PriorityItem<TElement>> ReadAsync(CancellationToken cancellationToken)
             {
                 if (cancellationToken.IsCancellationRequested)
-                    return new ValueTask<(int priority, TElement item)>(Task.FromCanceled<(int priority, TElement item)>(cancellationToken));
+                    return new ValueTask<PriorityItem<TElement>>(Task.FromCanceled<PriorityItem<TElement>>(cancellationToken));
 
                 PriorityChannel<TElement> parent = _parent;
                 for (int i = 0; i < parent._priorityCount; i++)
-                    if (parent._queues[i].TryDequeue(out (int priority, TElement item) item))
+                    if (parent._queues[i].TryDequeue(out PriorityItem<TElement>? item))
                     {
                         Interlocked.Decrement(ref parent.m_count);
                         CompleteIfDone(parent);
-                        return new ValueTask<(int priority, TElement item)>(item);
+                        return new ValueTask<PriorityItem<TElement>>(item);
                     }
 
                 lock (parent.SyncObj)
                 {
                     for (int i = 0; i < parent._priorityCount; i++)
-                        if (parent._queues[i].TryDequeue(out (int priority, TElement item) item))
+                        if (parent._queues[i].TryDequeue(out PriorityItem<TElement>? item))
                         {
                             Interlocked.Decrement(ref parent.m_count);
                             CompleteIfDone(parent);
-                            return new ValueTask<(int priority, TElement item)>(item);
+                            return new ValueTask<PriorityItem<TElement>>(item);
                         }
 
                     if (parent._doneWriting != null)
-                        return ChannelUtilities.GetInvalidCompletionValueTask<(int priority, TElement item)>(parent._doneWriting);
+                        return ChannelUtilities.GetInvalidCompletionValueTask<PriorityItem<TElement>>(parent._doneWriting);
 
                     if (!cancellationToken.CanBeCanceled)
                     {
-                        AsyncOperation<(int priority, TElement item)> singleton = _readerSingleton;
+                        AsyncOperation<PriorityItem<TElement>> singleton = _readerSingleton;
                         if (singleton.TryOwnAndReset())
                         {
                             parent._blockedReaders.EnqueueTail(singleton);
@@ -100,13 +160,18 @@ namespace DownloaderLibrary.Utilities
                         }
                     }
 
-                    AsyncOperation<(int priority, TElement item)> reader = new(true, cancellationToken);
+                    AsyncOperation<PriorityItem<TElement>> reader = new(true, cancellationToken);
                     parent._blockedReaders.EnqueueTail(reader);
                     return reader.ValueTaskOfT;
                 }
             }
 
-            public override bool TryRead([MaybeNullWhen(false)] out (int priority, TElement item) item)
+            /// <summary>
+            /// Trys to read the next <see cref="PriorityItem{TElement}"/>
+            /// </summary>
+            /// <param name="item">nest <see cref="PriorityItem{TElement}"/> in list</param>
+            /// <returns>A bool that indicates success</returns>
+            public override bool TryRead([MaybeNullWhen(false)] out PriorityItem<TElement> item)
             {
                 PriorityChannel<TElement> parent = _parent;
 
@@ -122,13 +187,13 @@ namespace DownloaderLibrary.Utilities
                 return false;
             }
 
-            public override bool TryPeek([MaybeNullWhen(false)] out (int priority, TElement item) item)
+            public override bool TryPeek([MaybeNullWhen(false)] out PriorityItem<TElement> item)
             {
                 PriorityChannel<TElement> parent = _parent;
                 for (int i = 0; i < _parent._priorityCount; i++)
                     if (parent._queues[i].TryPeek(out item))
                         return true;
-                item = new();
+                item = null;
                 return false;
             }
 
@@ -179,7 +244,7 @@ namespace DownloaderLibrary.Utilities
 
         }
 
-        private sealed class PriorityChannelWriter : ChannelWriter<(int priority, TElement item)>
+        private sealed class PriorityChannelWriter : ChannelWriter<PriorityItem<TElement>>
         {
             internal readonly PriorityChannel<TElement> _parent;
             internal PriorityChannelWriter(PriorityChannel<TElement> parent) => _parent = parent;
@@ -200,18 +265,18 @@ namespace DownloaderLibrary.Utilities
                 if (completeTask)
                     ChannelUtilities.Complete(parent._completion, error);
 
-                ChannelUtilities.FailOperations<AsyncOperation<(int priority, TElement item)>, (int priority, TElement item)>(parent._blockedReaders, ChannelUtilities.CreateInvalidCompletionException(error));
+                ChannelUtilities.FailOperations<AsyncOperation<PriorityItem<TElement>>, PriorityItem<TElement>>(parent._blockedReaders, ChannelUtilities.CreateInvalidCompletionException(error));
                 ChannelUtilities.WakeUpWaiters(ref parent._waitingReadersTail, result: false, error: error);
 
                 return true;
             }
 
-            public override bool TryWrite((int priority, TElement item) pair)
+            public override bool TryWrite(PriorityItem<TElement> pair)
             {
                 PriorityChannel<TElement> parent = _parent;
                 while (true)
                 {
-                    AsyncOperation<(int priority, TElement item)>? blockedReader = null;
+                    AsyncOperation<PriorityItem<TElement>>? blockedReader = null;
                     AsyncOperation<bool>? waitingReadersTail = null;
                     lock (parent.SyncObj)
                     {
@@ -222,7 +287,7 @@ namespace DownloaderLibrary.Utilities
 
                         if (parent._blockedReaders.IsEmpty)
                         {
-                            parent._queues[pair.priority].Enqueue(pair);
+                            parent._queues[pair.Priority].Enqueue(pair);
                             Interlocked.Increment(ref parent.m_count);
                             waitingReadersTail = parent._waitingReadersTail;
                             if (waitingReadersTail == null)
@@ -260,7 +325,7 @@ namespace DownloaderLibrary.Utilities
                     default;
             }
 
-            public override ValueTask WriteAsync((int priority, TElement item) item, CancellationToken cancellationToken) =>
+            public override ValueTask WriteAsync(PriorityItem<TElement> item, CancellationToken cancellationToken) =>
                 cancellationToken.IsCancellationRequested ? new ValueTask(Task.FromCanceled(cancellationToken)) :
                 TryWrite(item) ? default :
                 new ValueTask(Task.FromException(ChannelUtilities.CreateInvalidCompletionException(_parent._doneWriting)));
@@ -272,15 +337,15 @@ namespace DownloaderLibrary.Utilities
         /// Creates a Array out the actual members of this Channel
         /// </summary>
         /// <returns>A Array T</returns>
-        public (int priority, TElement item)[] ToArray()
+        public PriorityItem<TElement>[] ToArray()
         {
-            (int priority, TElement item)[] result;
+            PriorityItem<TElement>[] result;
 
             lock (_queues)
             {
-                result = new (int priority, TElement item)[Reader.Count];
+                result = new PriorityItem<TElement>[Reader.Count];
                 int index = 0;
-                foreach (ConcurrentQueue<(int priority, TElement item)> q in _queues)
+                foreach (ConcurrentQueue<PriorityItem<TElement>> q in _queues)
                     if (q.Count > 0)
                     {
                         q.CopyTo(result, index);
